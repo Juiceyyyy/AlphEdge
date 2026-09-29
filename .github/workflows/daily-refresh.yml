@@ -1,7 +1,7 @@
 name: Daily research refresh
 on:
   schedule:
-    - cron: '0 13 * * 1-5' # 18:30 IST on weekdays; GitHub may delay scheduled runs.
+    - cron: '17 13 * * 1-5' # 18:47 IST on weekdays; GitHub may delay scheduled runs.
   workflow_dispatch:
   push:
     branches: [main]
