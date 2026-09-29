@@ -8,6 +8,16 @@ from dashboard.store import read_snapshot, write_snapshot
 
 
 class StoreTest(unittest.TestCase):
+    def test_public_file_snapshot_round_trip_without_database(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {
+            "RESEARCH_SNAPSHOT_FILE": str(Path(directory) / "state" / "current_snapshot.json"),
+            "DATABASE_URL": "",
+        }):
+            self.assertIsNone(read_snapshot())
+            write_snapshot({"price_date": "2026-09-28", "basket": {"positions": []}})
+            self.assertEqual(read_snapshot()["price_date"], "2026-09-28")
+            self.assertFalse(Path(directory, "state", "current_snapshot.json.tmp").exists())
+
     def test_atomic_snapshot_round_trip(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {"RESEARCH_DB": str(Path(directory) / "research.sqlite"), "DATABASE_URL": ""}):
             self.assertIsNone(read_snapshot())

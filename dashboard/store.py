@@ -1,4 +1,4 @@
-"""Atomic research snapshot storage. Use Postgres when DATABASE_URL is set."""
+"""Atomic public file snapshots, with optional local SQLite or Postgres storage."""
 import json
 import os
 import sqlite3
@@ -27,6 +27,10 @@ def initialize():
 
 
 def read_snapshot(name="daily"):
+    snapshot_path = os.getenv("RESEARCH_SNAPSHOT_FILE")
+    if name == "daily" and snapshot_path:
+        snapshot_file = Path(snapshot_path)
+        return json.loads(snapshot_file.read_text(encoding="utf-8")) if snapshot_file.exists() else None
     initialize()
     with connection() as (db, marker):
         row = db.execute(f"SELECT payload FROM research_snapshots WHERE name = {marker}", (name,)).fetchone()
@@ -35,6 +39,14 @@ def read_snapshot(name="daily"):
 
 def write_snapshot(payload, name="daily"):
     serialized = json.dumps(payload, allow_nan=False, separators=(",", ":"))
+    snapshot_path = os.getenv("RESEARCH_SNAPSHOT_FILE")
+    if name == "daily" and snapshot_path:
+        path = Path(snapshot_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(path.suffix + ".tmp")
+        temporary.write_text(serialized + "\n", encoding="utf-8")
+        temporary.replace(path)
+        return
     initialize()
     with connection() as (db, marker):
         db.execute(f"INSERT INTO research_snapshots(name,payload) VALUES ({marker},{marker}) "

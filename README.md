@@ -1,12 +1,12 @@
 # AlphEdge
 
-An Indian-equity momentum research site with a daily forward model record and an optional **self-hosted** Zerodha Kite account runner. The public site shows historical simulations and the stocks the model would target today. It never connects to a visitor's brokerage account or displays real account balances.
+An Indian-equity momentum research site with a weekday forward model record and an optional **self-hosted** Zerodha Kite account runner. The public site shows historical simulations and the stocks the model would target today. It never connects to a visitor's brokerage account or displays real account balances.
 
 ## What you can inspect
 
 - Historical strategy and Nifty 50 results, annual returns, three-year windows, drawdown, and risk-adjusted metrics.
 - A lump-sum and monthly-contribution illustration based on saved historical results. Annual-to-monthly interpolation is clearly labelled; an on-demand rerun can show monthly backtest checkpoints.
-- Current model stocks and target percentage weights, with the latest price date. A risk-off signal can produce a 100% cash target. A separate forward model index starts at 100 on its first observation and adds a close-to-close observation after each new market day.
+- Current model stocks and target percentage weights, with the latest price date. A risk-off signal can produce a 100% cash target. A separate forward model index starts at 100 on its first observation and adds a close-to-close observation after each successful refresh for a new market day.
 - Switches for the Nifty and individual-stock 200-day moving-average filters, plus target basket size. A changed strategy requires an explicit recalculation.
 
 The strategy ranks liquid NSE constituents by a weighted six- and twelve-month momentum score with a 21-session skip. It holds up to ten names, weighted by inverse realized volatility, with optional 200-day filters. See [`config.yaml`](config.yaml) for the baseline. The checked-in results are **selected historical simulations** using today's constituent universe, not a prospective record. Data-provider delays, survivorship bias, corporate actions and execution costs can materially change outcomes.
@@ -23,15 +23,19 @@ python -m jobs.refresh                    # first refresh; requires market-data 
 uvicorn dashboard.app:api --host 127.0.0.1 --port 8000
 ```
 
-Open `http://127.0.0.1:8000/`. Without an initial refresh, the site still shows the bundled baseline and clearly marks the current basket as pending. By default the refresh stores a SQLite snapshot in ignored `var/research.sqlite`. Set `DATABASE_URL` to use Postgres. Both the web process and the scheduled job must point to the **same persistent database**. Do not put broker credentials on the public web process.
+Open `http://127.0.0.1:8000/`. Without an initial refresh, the site still shows the bundled baseline and clearly marks the current basket as pending. By default a local refresh uses an ignored SQLite file (`var/research.sqlite`). The free hosted site instead sets `RESEARCH_SNAPSHOT_FILE=state/current_snapshot.json` to read the snapshot committed by GitHub Actions. Do not put broker credentials on the public web process.
 
 The first refresh creates the model basket and sets both forward indices to 100; it does not claim any prior forward returns. Subsequent refreshes mark the previous basket to new closes, then select a new basket after the first recorded close of a new month. They write one atomic snapshot only when all required prices are available. A failed refresh retains the last snapshot and its original price date. The daily graph is a **hypothetical forward model**, not real investor returns: it excludes execution costs, dividends and account constraints. The separate long-run chart remains a historical backtest.
 
-## Deploy the public site and daily refresh
+## Free deployment and weekday refresh
 
-[`render.yaml`](render.yaml) defines a new web service, Postgres database, and weekday cron job for this repository. It does not reference any earlier service. Connect **your own fork** as a new Render Blueprint, choose a paid compute and database plan, and check the displayed costs before creating resources. The cron expression `0 13 * * 1-5` runs at 13:00 UTC (18:30 IST), after the usual NSE close. Trigger the cron job once after deployment to populate the initial snapshot. Confirm the `/api/explore` `snapshot.price_date` advances on trading days; the job may run on exchange holidays without new prices. Configure monitoring for failed cron jobs and stale data in your hosting account.
+The public site can run as a free Python web service on Render: connect this repository's `main` branch, build with `pip install -r requirements.txt`, and start with `uvicorn dashboard.app:api --host 0.0.0.0 --port $PORT --workers 1`. Set `RESEARCH_SNAPSHOT_FILE=state/current_snapshot.json` on the web service. No database or broker environment variables are needed. The existing project site is at <https://alphedge-web.onrender.com/explore>. Free web instances can sleep and restart; the bundled historical results still load.
 
-The web process serves read-only research data. Its calculation endpoints are bounded to 5–15 holdings, serialized, and cached in-process; substantial public traffic needs shared caching, rate limiting, and separate compute before scaling beyond one worker. Monthly basket selection and daily marking depend on external universe and market-data providers. Their outages and changes can interrupt updates. Review provider licensing before redistributing derived data commercially.
+[`.github/workflows/daily-refresh.yml`](.github/workflows/daily-refresh.yml) runs `python -m jobs.refresh` at 13:00 UTC (18:30 IST) on weekdays, and can be run manually from GitHub Actions. It commits **only** `state/current_snapshot.json` when a new price date is available. Render's auto-deploy of `main` then makes that public snapshot available to the site. GitHub can delay or skip scheduled jobs, and neither provider guarantees a fresh market close. Check the Actions run and the `/api/explore` snapshot price date after market days. A holiday leaves the last date in place. The snapshot contains model target tickers, percentage weights, prices and a hypothetical forward index; it contains no personal account details.
+
+To run the same refresh locally against a tracked snapshot, set `RESEARCH_SNAPSHOT_FILE=state/current_snapshot.json` for the command and commit the resulting public file. Without this variable, local refreshes use an ignored SQLite file (`var/research.sqlite`). Do not set broker keys in GitHub Actions or Render. The first successful refresh creates a basket and starts both forward indices at 100; it does not claim earlier live returns. Later runs mark the previous target basket to a new closing price, then rebalance after the first recorded close of a new month. A failed refresh leaves the last committed snapshot unchanged. The forward series is a **hypothetical model**, excluding actual execution costs, dividends and account constraints.
+
+The web process serves research data. On-demand scenario calculations are bounded to 5–15 holdings, serialized, and cached in-process; public traffic may need rate limits and separate compute. The market-data and universe sources can fail or change. Review their licenses before wider redistribution. No paid resources are provisioned by this repository.
 
 ## Connect **your own** Kite account (local only)
 
@@ -58,6 +62,6 @@ These cover storage replacement, broker planning without orders, default disable
 
 ## Public repository boundaries
 
-The repository includes source, configuration templates and historical research outputs. It excludes `.env`, account tokens, local journals, price caches, SQLite databases, logs and private holdings. Check `git status` and run a secret scan before every public push. Keep account runners in each user's private environment; never paste broker keys into issues, screenshots or public deployment variables.
+The repository includes source, configuration templates, historical research outputs and a public model snapshot when available. It excludes `.env`, account tokens, local journals, price caches, SQLite databases, logs and private holdings. Check `git status` and run a secret scan before every public push. Keep account runners in each user's private environment; never paste broker keys into issues, screenshots or public deployment variables.
 
 MIT licensed. Educational research; no investment recommendation or guarantee of returns.
