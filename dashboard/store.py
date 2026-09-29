@@ -3,7 +3,16 @@ import json
 import os
 import sqlite3
 from contextlib import contextmanager
+from functools import lru_cache
 from pathlib import Path
+from time import time
+from urllib.request import urlopen
+
+
+@lru_cache(maxsize=12)
+def _remote_snapshot(url, five_minute_window):
+    with urlopen(url, timeout=5) as response:
+        return json.load(response)
 
 
 @contextmanager
@@ -27,6 +36,12 @@ def initialize():
 
 
 def read_snapshot(name="daily"):
+    remote_url = os.getenv("RESEARCH_SNAPSHOT_URL")
+    if name == "daily" and remote_url:
+        try:
+            return _remote_snapshot(remote_url, int(time() // 300))
+        except (OSError, ValueError):
+            return None
     snapshot_path = os.getenv("RESEARCH_SNAPSHOT_FILE")
     if name == "daily" and snapshot_path:
         snapshot_file = Path(snapshot_path)
