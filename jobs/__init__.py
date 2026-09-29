@@ -1,0 +1,1 @@
+"""Scheduled public research refresh."""

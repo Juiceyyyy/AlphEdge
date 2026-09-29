@@ -1,0 +1,156 @@
+"""Explicit-plan CNC rebalance for an individual's locally managed Kite account.
+
+The public research server never imports or calls this module.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+import os
+from datetime import date, datetime, time, timezone
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+from alpha_strategy.config import StrategyConfig, load_env
+from dashboard.explorer import _current_candidates
+from .kite import KiteClient
+
+IST = ZoneInfo("Asia/Kolkata")
+STATE = Path(os.getenv("BROKER_STATE_DIR", "var/broker"))
+
+
+def _positive_limit(name):
+    value = float(os.getenv(name, "0"))
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f"Set a positive {name} in the local environment")
+    return value
+
+
+def _json(path, fallback):
+    return json.loads(path.read_text()) if path.exists() else fallback
+
+
+def _write(path, payload):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True))
+    os.replace(temporary, path)
+
+
+def build_plan(client):
+    cfg = StrategyConfig.from_yaml("config.yaml")
+    basket = _current_candidates(cfg.use_trend_filter, cfg.require_above_ma, cfg.n_hold)
+    today = datetime.now(IST).date()
+    if (today - date.fromisoformat(basket["date"])).days > 4:
+        raise RuntimeError("Model price date is stale; no plan generated")
+    cap = _positive_limit("MAX_CAPITAL_INR")
+    per_order = _positive_limit("MAX_ORDER_NOTIONAL_INR")
+    managed = set(_json(STATE / "managed_symbols.json", []))
+    existing = {h["tradingsymbol"]: int(h.get("quantity", 0)) + int(h.get("t1_quantity", 0))
+                for h in client.holdings() if h.get("exchange") == "NSE" and h.get("product") == "CNC"}
+    target_symbols = {p["ticker"].removesuffix(".NS") for p in basket["positions"]}
+    symbols = sorted(target_symbols | managed)
+    if not symbols:
+        raise RuntimeError("No target or managed positions to review")
+    quotes = client.ltp(symbols)
+    prices = {s: float(quotes[f"NSE:{s}"]["last_price"]) for s in symbols}
+    if any(not math.isfinite(p) or p <= 0 for p in prices.values()):
+        raise RuntimeError("Invalid broker quotes")
+    targets = {p["ticker"].removesuffix(".NS"): math.floor(cap * p["weight"] / prices[p["ticker"].removesuffix(".NS")])
+               for p in basket["positions"]}
+    orders = []
+    for symbol in symbols:
+        owned = existing.get(symbol, 0) if symbol in managed else 0
+        desired = targets.get(symbol, 0)
+        delta = desired - owned
+        if delta == 0:
+            continue
+        if symbol not in managed and symbol in existing and existing[symbol] > 0:
+            raise RuntimeError(f"{symbol} is held outside this runner; add it to managed_symbols.json only after review")
+        notional = abs(delta) * prices[symbol]
+        if notional > per_order:
+            raise RuntimeError(f"{symbol} exceeds MAX_ORDER_NOTIONAL_INR")
+        orders.append({"side": "BUY" if delta > 0 else "SELL", "symbol": symbol,
+                       "quantity": abs(delta), "quote": prices[symbol], "estimated_notional": round(notional, 2)})
+    if sum(o["estimated_notional"] for o in orders) > cap * 1.25:
+        raise RuntimeError("Turnover exceeds 125% of configured capital")
+    plan = {"created_at": datetime.now(timezone.utc).isoformat(), "price_date": basket["date"],
+            "capital_limit": cap, "risk_on": basket["risk_on"], "orders": orders,
+            "managed_symbols": sorted(managed), "target_symbols": sorted(target_symbols)}
+    plan["id"] = hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()[:16]
+    return plan
+
+
+def execute(client, plan, confirmation):
+    if os.getenv("TRADING_ENABLED", "false").lower() != "true":
+        raise RuntimeError("TRADING_ENABLED must be true in the local runner")
+    unsigned = {key: value for key, value in plan.items() if key != "id"}
+    digest = hashlib.sha256(json.dumps(unsigned, sort_keys=True).encode()).hexdigest()[:16]
+    if confirmation != plan["id"] or digest != plan["id"]:
+        raise RuntimeError("Plan confirmation ID mismatch or plan file changed")
+    now = datetime.now(IST)
+    if now.date() != datetime.fromisoformat(plan["created_at"].replace("Z", "+00:00")).astimezone(IST).date():
+        raise RuntimeError("Plan must be generated today")
+    if now.weekday() >= 5 or not time(9, 20) <= now.time() <= time(15, 10):
+        raise RuntimeError("Orders only allowed during the configured NSE session window")
+    if (datetime.now(timezone.utc) - datetime.fromisoformat(plan["created_at"])).total_seconds() > 900:
+        raise RuntimeError("Plan expired after 15 minutes")
+    journal_path = STATE / f"execution_{plan['id']}.json"
+    if journal_path.exists():
+        raise RuntimeError("Plan already started; reconcile its journal and broker order book before proceeding")
+    current = {h["tradingsymbol"]: int(h.get("quantity", 0)) + int(h.get("t1_quantity", 0))
+               for h in client.holdings() if h.get("exchange") == "NSE" and h.get("product") == "CNC"}
+    for order in plan["orders"]:
+        symbol = order["symbol"]
+        if order["side"] == "SELL" and current.get(symbol, 0) < order["quantity"]:
+            raise RuntimeError(f"Insufficient {symbol} holdings")
+    journal = {"plan_id": plan["id"], "started_at": now.isoformat(), "orders": [], "status": "started"}
+    _write(journal_path, journal)
+    for order in sorted(plan["orders"], key=lambda o: o["side"] != "SELL"):
+        quote = float(client.ltp([order["symbol"]])[f"NSE:{order['symbol']}"]["last_price"])
+        if abs(quote / order["quote"] - 1) > 0.02:
+            raise RuntimeError(f"{order['symbol']} quote moved more than 2%; stop and replan")
+        if order["side"] == "BUY":
+            available = float(client.margins()["available"]["live_balance"])
+            if available < order["quantity"] * quote * 1.02:
+                raise RuntimeError(f"Insufficient available funds for {order['symbol']}")
+        # Journal intent before sending: an ambiguous network failure must never auto-retry.
+        entry = {**order, "status": "submitting"}
+        journal["orders"].append(entry); _write(journal_path, journal)
+        order_id = client.place(order["side"], order["symbol"], order["quantity"], tag="MAT" + plan["id"][:12])
+        entry.update(order_id=order_id, status="submitted"); _write(journal_path, journal)
+        # Placement is not a fill. Stop for manual reconciliation on any open or rejected order.
+        history = client.order_history(order_id)
+        status = history[-1]["status"] if history else "UNKNOWN"
+        entry["status"] = status; _write(journal_path, journal)
+        if status != "COMPLETE":
+            raise RuntimeError(f"{order_id} status {status}; reconcile manually before any new run")
+    managed = set(plan["managed_symbols"]) | set(plan["target_symbols"])
+    _write(STATE / "managed_symbols.json", sorted(managed))
+    journal["status"] = "complete"; _write(journal_path, journal)
+    return journal
+
+
+def main():
+    load_env()
+    parser = argparse.ArgumentParser(description="Local, opt-in Kite CNC strategy runner")
+    parser.add_argument("command", choices=["plan", "execute"])
+    parser.add_argument("--plan-file", default="var/broker/latest_plan.json")
+    parser.add_argument("--confirm", help="Exact plan ID printed during plan review")
+    args = parser.parse_args()
+    client = KiteClient()
+    if args.command == "plan":
+        plan = build_plan(client)
+        _write(Path(args.plan_file), plan)
+        print(json.dumps(plan, indent=2))
+        print(f"Review every proposed order. To execute today: python -m broker.runner execute --confirm {plan['id']}")
+    else:
+        plan = _json(Path(args.plan_file), None)
+        if not plan: raise RuntimeError("No saved plan")
+        print(json.dumps(execute(client, plan, args.confirm), indent=2))
+
+
+if __name__ == "__main__":
+    main()

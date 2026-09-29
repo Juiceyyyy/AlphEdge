@@ -1,0 +1,43 @@
+# AlphEdge - max-Sharpe momentum config (LOCKED winner)
+# 15-year backtest: CAGR 40.69% / Max DD -20.91% / Sharpe 1.93 / Calmar 1.95
+# Walk-forward verified: 24/24 rolling 3y windows positive alpha (100%)
+
+# Capital
+starting_capital: 10000
+
+# Universe (dynamic NSE constituents, refreshed monthly)
+index_universe: combined          # Nifty 200 + Next 50 + Midcap 150
+top_n_by_adtv: 250                # ADTV-ranked top-N candidates
+adtv_lookback_days: 63
+universe_refresh_days: 30
+data_lookback_years: 16
+benchmark_ticker: ^NSEI
+
+# Momentum signal (Jegadeesh-Titman style)
+n_hold: 10                         # number of stocks held when fully invested
+rebalance_freq: M                  # monthly first-trading-day rebalance
+lookback_short: 126                # 6 months
+lookback_long: 252                 # 12 months
+momentum_skip: 21                  # skip last month (avoid short-term reversal)
+weight_short: 0.3                  # blend: 30% on r6, 70% on r12
+weight_long: 0.7
+weighting: inverse_vol             # inverse-vol position sizing
+vol_window: 63
+
+# Filters
+require_above_ma: true             # only buy stocks above their 200-DMA
+long_ma_window: 200
+min_momentum: 0.0
+use_trend_filter: true             # cash-out when Nifty < 200-DMA
+trend_filter_window: 200
+target_total_exposure: 1.0
+
+# Execution costs
+slippage_bps: 5
+commission_bps: 3
+
+# Paths
+data_cache_dir: cache/ohlcv
+state_dir: state
+log_dir: logs
+

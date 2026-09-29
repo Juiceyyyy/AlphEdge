@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a1012">
+  <title>AlphEdge — Strategy research</title>
+  <link rel="stylesheet" href="/explore/styles.css">
+  <script src="/explore/app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="brand" href="/explore" aria-label="AlphEdge home"><span class="brand-mark">AE</span><span>AlphEdge</span><span class="brand-divider"></span><span class="brand-sub">Research lab</span></a>
+      <nav aria-label="Page sections"><a href="#explorer">Backtest</a><a href="#portfolio">Model holdings</a><a href="#methodology">Methodology</a></nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero shell">
+      <div class="eyebrow"><span class="signal"></span> INDIAN EQUITIES · STRATEGY RESEARCH</div>
+      <div class="hero-grid">
+        <div>
+          <h1>Understand the strategy.<br><em>Explore the outcomes.</em></h1>
+          <p class="lead">A transparent look at a rules-based momentum strategy for NSE equities. Adjust an investment illustration, compare historical results, and see which stocks currently meet the model rules and their target weights.</p>
+          <div class="hero-actions"><a class="button primary" href="#explorer">Explore the backtest <span aria-hidden="true">↗</span></a><a class="text-link" href="#methodology">How it works <span aria-hidden="true">↓</span></a></div>
+        </div>
+        <div class="hero-note"><span class="note-index">01 / RESEARCH NOTE</span><p>The system ranks liquid stocks by six- and twelve-month momentum, sizes positions by volatility, and can move to cash when the Nifty trend weakens.</p><span class="note-foot">Historical simulation ≠ live returns</span></div>
+      </div>
+    </section>
+
+    <section class="shell summary" aria-labelledby="results-heading">
+      <div class="section-top"><div><span class="kicker">THE HISTORICAL RECORD</span><h2 id="results-heading">Backtest at a glance</h2></div><span class="source-label">Saved baseline · 2011–2026</span></div>
+      <div class="stat-grid">
+        <article class="stat"><span>Annualized return</span><strong id="kpi-cagr">—</strong><small>Simulated CAGR</small></article>
+        <article class="stat"><span>Worst drawdown</span><strong id="kpi-drawdown">—</strong><small>Peak to trough</small></article>
+        <article class="stat"><span>Sharpe ratio</span><strong id="kpi-sharpe">—</strong><small>Historical risk-adjusted return</small></article>
+        <article class="stat"><span>Nifty 50 CAGR</span><strong id="kpi-benchmark">—</strong><small>Same backtest period</small></article>
+      </div>
+    </section>
+
+    <section class="section-tint" id="explorer" aria-labelledby="explorer-heading"><div class="shell">
+      <div class="section-top"><div><span class="kicker">YOUR SCENARIO</span><h2 id="explorer-heading">Investment explorer</h2><p>See how a lump sum and recurring contribution would have followed recorded historical returns.</p></div><div class="section-number">01 — 04</div></div>
+      <div class="explorer-grid">
+        <aside class="controls card" aria-label="Investment and strategy settings">
+          <div class="card-head"><h3>Set your scenario</h3><span class="chip">Adjustable</span></div>
+          <div class="control"><div class="control-head"><label for="lump">Initial investment</label><output id="lump-value" for="lump">₹1,00,000</output></div><input type="range" id="lump" min="0" max="5000000" step="10000" value="100000"><div class="scale"><span>₹0</span><span>₹50L</span></div></div>
+          <div class="control"><div class="control-head"><label for="sip">Monthly contribution</label><output id="sip-value" for="sip">₹10,000</output></div><input type="range" id="sip" min="0" max="100000" step="1000" value="10000"><div class="scale"><span>₹0</span><span>₹1L</span></div></div>
+          <div class="control"><div class="control-head"><label for="horizon">Lookback period</label><output id="horizon-value" for="horizon">10 years</output></div><input type="range" id="horizon" min="3" max="14" step="1" value="10"><div class="scale"><span>3 years</span><span>14 years</span></div></div>
+          <div class="rule"></div>
+          <div class="control-head strategy-label"><h4>Strategy rules</h4><span>Recalculation required</span></div>
+          <label class="switch-row"><span><strong>Nifty 200-day trend filter</strong><small>Move to cash below the moving average</small></span><input id="trend" type="checkbox" checked role="switch"><span class="switch-ui" aria-hidden="true"></span></label>
+          <label class="switch-row"><span><strong>Stock 200-day filter</strong><small>Only select stocks above their moving average</small></span><input id="stock" type="checkbox" checked role="switch"><span class="switch-ui" aria-hidden="true"></span></label>
+          <div class="control hold"><div class="control-head"><label for="holdings">Target holdings</label><output id="holdings-value" for="holdings">10 stocks</output></div><input type="range" id="holdings" min="5" max="15" step="1" value="10"></div>
+          <button id="recalculate" class="button dark" type="button">Recalculate backtest <span aria-hidden="true">→</span></button>
+          <p class="control-hint">Rule changes rerun the historical engine. The chart keeps the saved baseline until a fresh result is ready.</p>
+        </aside>
+        <div class="results">
+          <div class="chart-card card">
+            <div class="chart-header"><div><span class="kicker">HISTORICAL ILLUSTRATION</span><h3>How your contributions could have grown</h3></div><span id="chart-mode" class="mode">Saved annual results</span></div>
+            <div class="totals"><div><span>Strategy illustration</span><strong id="strategy-total">—</strong></div><div><span>Nifty illustration</span><strong id="benchmark-total">—</strong></div><div><span>Total contributed</span><strong id="contributed-total">—</strong></div></div>
+            <div class="legend"><span><i class="key strategy-key"></i> Strategy</span><span><i class="key benchmark-key"></i> Nifty 50</span></div>
+            <div class="chart-wrap"><svg id="growth-chart" viewBox="0 0 760 300" preserveAspectRatio="none" role="img" aria-label="Historical investment illustration chart"></svg></div>
+            <div class="chart-footer"><span id="chart-period">—</span><span id="chart-detail">Monthly values estimated from saved annual returns</span></div>
+          </div>
+          <div class="backtest-detail card"><div class="card-head"><h3>Annual results</h3><span class="chip outline">Strategy vs Nifty 50</span></div><div class="table-scroll"><table><thead><tr><th>Year</th><th>Strategy</th><th>Nifty 50</th></tr></thead><tbody id="annual-results"></tbody></table></div></div>
+          <div class="backtest-detail card"><div class="card-head"><h3>Three-year windows</h3><span class="chip outline">Non-overlapping periods</span></div><div class="table-scroll"><table><thead><tr><th>Period</th><th>Strategy CAGR</th><th>Nifty CAGR</th><th>Drawdown</th></tr></thead><tbody id="window-results"></tbody></table></div><p class="table-note">These windows do not overlap, but they reuse the selected configuration. They are not independent out-of-sample evidence.</p></div>
+          <div id="scenario-message" class="message" role="status" aria-live="polite">Historical illustrations are hypothetical. Monthly contributions are applied at the start of each month.</div>
+        </div>
+      </div>
+      <p class="disclosure">The initial chart distributes each saved year's return evenly across its months to illustrate contribution timing. It does not recover the actual monthly path. Recalculate to use a fresh historical run with monthly checkpoints. Changing your deposit changes the replayed balance, not the model rules.</p>
+    </div></section>
+
+    <section class="shell portfolio-section" id="portfolio" aria-labelledby="portfolio-heading">
+      <div class="section-top"><div><span class="kicker">LATEST AVAILABLE MARKET DATA</span><h2 id="portfolio-heading">Current model holdings</h2><p>The stocks the selected rules would hold using the latest available closing prices. These are target weights, not actual investments.</p></div><div class="section-number">02 — 04</div></div>
+      <div class="card holdings-card">
+        <div class="card-head"><div><h3>Research basket</h3><span id="candidate-status" class="candidate-status" role="status" aria-live="polite">Calculating the latest model basket…</span></div><button id="calculate-candidates" class="button secondary" type="button">Refresh holdings <span aria-hidden="true">↻</span></button></div>
+        <div id="candidate-positions" class="position-list" aria-live="polite"></div>
+        <p class="basket-note">Weights use inverse volatility and sum to 100% when the model is invested. The Nifty trend filter may instead indicate 100% cash. Market data may be delayed or unavailable; no securities are fabricated when the calculation fails.</p>
+      </div>
+    </section>
+
+    <section class="shell forward-section" aria-labelledby="forward-heading">
+      <div class="section-top"><div><span class="kicker">AFTER PUBLICATION</span><h2 id="forward-heading">Forward research model</h2><p>A close-to-close model index, updated when a new price date is available. Both series start at 100 on the first recorded day.</p></div></div>
+      <div class="card chart-card"><div class="totals"><div><span>Model index</span><strong id="forward-model">—</strong></div><div><span>Nifty 50 index</span><strong id="forward-nifty">—</strong></div><div><span>Recorded period</span><strong id="forward-period" class="period-value">—</strong></div></div><div class="legend"><span><i class="key strategy-key"></i> Model</span><span><i class="key benchmark-key"></i> Nifty 50</span></div><div class="chart-wrap forward-wrap"><svg id="forward-chart" viewBox="0 0 760 200" preserveAspectRatio="none" role="img" aria-label="Forward research record pending"></svg></div><p class="basket-note">This is a hypothetical model record from the first daily snapshot, with prior basket weights applied to subsequent close-to-close price changes. A new basket is selected after the first recorded close of each month. It excludes execution costs, dividends and actual account behavior.</p></div>
+    </section>
+
+    <section class="section-tint method" id="methodology" aria-labelledby="method-heading"><div class="shell">
+      <div class="section-top"><div><span class="kicker">THE LOGIC</span><h2 id="method-heading">A simple idea, with explicit rules</h2></div><div class="section-number">04 — 04</div></div>
+      <div class="method-grid">
+        <article><span class="method-index">01</span><h3>Find liquid stocks</h3><p>Start with NSE index constituents and rank candidates by their average daily traded value over roughly three months.</p></article>
+        <article><span class="method-index">02</span><h3>Rank momentum</h3><p>Blend six- and twelve-month price returns, ignoring the latest 21 trading days. Select the strongest eligible names.</p></article>
+        <article><span class="method-index">03</span><h3>Control exposure</h3><p>Use inverse volatility weights. The optional 200-day filters screen individual stocks and the broader Nifty trend.</p></article>
+        <article><span class="method-index">04</span><h3>Review the model basket</h3><p>Apply the rules to the latest available closing prices. Show each eligible stock’s target weight and the price date; recalculate when settings change.</p></article>
+      </div>
+      <div class="research-note"><div><span class="kicker">READ THE RESULTS CAREFULLY</span><h3>Backtests are research, not a return promise.</h3></div><p>The saved configuration was selected using historical data. Current index membership, execution assumptions and changing market conditions can make simulated results too optimistic. The three-year windows reuse that selected configuration and are not independent prospective results. Market prices and constituents are provided by external data sources.</p></div>
+    </div></section>
+  </main>
+  <footer><div class="shell footer-inner"><span><strong>AlphEdge</strong> · Strategy research</span><span>Educational research · Historical results are not forecasts</span></div></footer>
+</body>
+</html>
