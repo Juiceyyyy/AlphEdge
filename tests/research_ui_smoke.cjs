@@ -22,7 +22,8 @@ const scenario={kpis:{cagr_pct:22,max_drawdown_pct:-18},months:Array.from({lengt
 overview.scenarios={computed_at:'2026-09-29T12:00:00Z',variants:{'1/1/10':scenario,'0/1/10':scenario}};
 overview.rolling_windows=[{start:'2020-01-01',end:'2022-12-31',cagr_pct:20,bench_cagr_pct:10,max_dd_pct:-12}];
 overview.snapshot={price_date:'2026-09-25',forward:[{date:'2026-09-25',model_index:100,benchmark_index:100}],basket};
-const fetch=async url=>({ok:true,json:async()=>url.endsWith('/scenario')?scenario:url.endsWith('/candidates')?basket:overview});
+let requests=0;
+const fetch=async url=>{requests++;return {ok:true,json:async()=>url.endsWith('/scenario')?scenario:url.endsWith('/candidates')?basket:overview}};
 const document={getElementById:get,createElement:()=>new Element(),createElementNS:()=>new Element(),createTextNode:t=>t};
 vm.runInNewContext(fs.readFileSync('dashboard/explorer.js','utf8'),{document,fetch,Intl,Number,Math,Array,Error,AbortController,setTimeout,clearTimeout,setInterval:()=>{},Date});
 setTimeout(async()=>{
@@ -33,10 +34,13 @@ setTimeout(async()=>{
   assert.equal(get('candidate-positions').children.length,2);
   assert.equal(get('forward-model').textContent,'100.00');
   assert.equal(get('candidate-positions').children[0].children[1].textContent,'60.0%');
+  const before=requests;
   get('trend').checked=false;get('trend').handlers.input();
   assert.match(get('candidate-status').textContent,/Refresh holdings/);
   assert.match(get('chart-mode').textContent,/Saved scenario/);
   get('sip-input').value='20000';get('sip-input').handlers.input();
   assert.match(get('contributed-total').textContent,/₹/);
+  get('end-month').value='2025-06';get('end-month').handlers.input();
+  assert.equal(requests,before,'chart controls must not make network requests');
   console.log('Research UI interactions passed');
 },30);
