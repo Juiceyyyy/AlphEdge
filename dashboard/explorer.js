@@ -96,7 +96,7 @@
     const recorded=manifest.snapshot?.forward||[];
     const history=scenarios?.variants?.['1/1/10']?.months?.filter(m=>m.date.slice(0,4)==='2026')||[];
     let a=100,b=100;
-    const reconstructed=history.map(m=>{a*=1+m.strategy_return;b*=1+m.benchmark_return;return{date:m.date,model_index:a,benchmark_index:b};});
+    const reconstructed=history.length?[{date:'2026-01-01',model_index:100,benchmark_index:100},...history.map(m=>{a*=1+m.strategy_return;b*=1+m.benchmark_return;return{date:m.date,model_index:a,benchmark_index:b};})]:[];
     // Never splice distinct retrospectively calculated and daily observed series.
     const use=reconstructed.length?reconstructed:recorded;
     set('forward-model',use.length?use.at(-1).model_index.toFixed(2):'—');set('forward-nifty',use.length?use.at(-1).benchmark_index.toFixed(2):'—');

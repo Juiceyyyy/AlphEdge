@@ -39,6 +39,7 @@ def compile_cache(scenarios, previous=None):
     previous = previous or {}
     through = date.fromisoformat(scenarios['data_through'])
     archived = dict(previous.get('archived', {}))
+    archived_windows = dict(previous.get('archived_windows', {}))
     variants = {}
     for key, variant in scenarios['variants'].items():
         months = variant['months']
@@ -59,16 +60,19 @@ def compile_cache(scenarios, previous=None):
                            'through': scenarios['data_through']})
         # Fixed calendar windows close at the end of a year. In-progress
         # trailing window is calculated separately from latest 36 checkpoints.
-        windows = []
+        frozen_windows = dict(archived_windows.get(key, {}))
         for year in years:
-            if year + 2 >= through.year:
+            if year + 2 >= through.year or str(year) in frozen_windows:
                 continue
             sample = [m for m in months if year <= int(m['date'][:4]) <= year+2]
             if len(sample) >= 30:
-                windows.append(summary(sample, f'{year}–{year+2}'))
+                frozen_windows[str(year)] = summary(sample, f'{year}–{year+2}')
+        archived_windows[key] = frozen_windows
+        windows = [frozen_windows[k] for k in sorted(frozen_windows)]
         active = summary(months[-36:], 'Trailing 36 months · active') if len(months) >= 36 else None
         variants[key] = {'annual': annual, 'windows': windows, 'active_window': active}
     return {'data_through': scenarios['data_through'], 'archived': archived,
+            'archived_windows': archived_windows,
             'variants': variants, 'method': 'Monthly backtest checkpoints. Completed calendar years archived; current year and trailing window refreshed from latest completed close.'}
 
 
