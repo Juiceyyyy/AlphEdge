@@ -22,6 +22,7 @@ h2,h3,h4,p{margin-top:0}h2{font:800 clamp(28px,3vw,40px)/1.2 Manrope,sans-serif;
 .date-range .control{margin-bottom:18px}
 .date-range label{display:block;margin-bottom:8px;font-size:12px;font-weight:700}
 .date-range input{width:100%;min-height:44px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#101c1d;color:var(--ink);color-scheme:dark}
+.amount-input{width:100%;min-height:44px;margin:5px 0 8px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:#101c1d;color:var(--ink);font-variant-numeric:tabular-nums}
 .window-summary{margin:20px 0;padding:15px 17px;border-left:3px solid var(--green);background:#172b26;color:#d7eae0;font-size:13px;font-weight:600}
 .rolling-detail{border-top:1px solid var(--line);margin-top:20px;padding-top:12px}
 .rolling-detail summary{cursor:pointer;min-height:44px;padding:10px 0;color:var(--green);font-size:13px;font-weight:700}

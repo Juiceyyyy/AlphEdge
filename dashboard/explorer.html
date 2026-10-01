@@ -46,8 +46,8 @@
       <div class="explorer-grid">
         <aside class="controls card" aria-label="Investment and strategy settings">
           <div class="card-head"><h3>Set your scenario</h3><span class="chip">Adjustable</span></div>
-          <div class="control"><div class="control-head"><label for="lump">Initial investment</label><output id="lump-value" for="lump">₹1,00,000</output></div><input type="range" id="lump" min="0" max="5000000" step="10000" value="100000"><div class="scale"><span>₹0</span><span>₹50L</span></div></div>
-          <div class="control"><div class="control-head"><label for="sip">Monthly contribution</label><output id="sip-value" for="sip">₹10,000</output></div><input type="range" id="sip" min="0" max="100000" step="1000" value="10000"><div class="scale"><span>₹0</span><span>₹1L</span></div></div>
+          <div class="control"><div class="control-head"><label for="lump">Initial investment</label><output id="lump-value" for="lump">₹1,00,000</output></div><input type="range" id="lump" min="0" max="5000000" step="10000" value="100000"><input class="amount-input" type="number" id="lump-input" min="0" step="1000" value="100000" aria-label="Exact initial investment in rupees"><div class="scale"><span>₹0</span><span>₹50L</span></div></div>
+          <div class="control"><div class="control-head"><label for="sip">Monthly contribution</label><output id="sip-value" for="sip">₹10,000</output></div><input type="range" id="sip" min="0" max="100000" step="1000" value="10000"><input class="amount-input" type="number" id="sip-input" min="0" step="500" value="10000" aria-label="Exact monthly contribution in rupees"><div class="scale"><span>₹0</span><span>₹1L</span></div></div>
           <div class="date-range"><div class="control"><label for="start-month">From</label><input id="start-month" type="month" value="2016-01" min="2012-01"></div><div class="control"><label for="end-month">Through</label><input id="end-month" type="month" value="2025-12" min="2012-01"></div></div>
           <div class="rule"></div>
           <div class="control-head strategy-label"><h4>Strategy rules</h4><span>Instant saved scenarios</span></div>

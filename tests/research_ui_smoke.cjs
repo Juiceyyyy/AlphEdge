@@ -12,7 +12,8 @@ class Element {
   get childElementCount(){return this.children.length}
 }
 const els=new Map();const get=id=>els.get(id)||(els.set(id,new Element()),els.get(id));
-Object.assign(get('lump'),{value:'100000'});Object.assign(get('sip'),{value:'10000'});
+Object.assign(get('lump'),{value:'100000',max:'5000000'});Object.assign(get('sip'),{value:'10000',max:'100000'});
+Object.assign(get('lump-input'),{value:'100000'});Object.assign(get('sip-input'),{value:'10000'});
 Object.assign(get('start-month'),{value:'2023-01'});Object.assign(get('end-month'),{value:'2025-12'});
 Object.assign(get('holdings'),{value:'10'});
 const overview={backtest:{kpis:{cagr_pct:40.69,max_drawdown_pct:-20.91,sharpe:1.93,benchmark_cagr_pct:10.11},yearly:Array.from({length:14},(_,i)=>({year:2012+i,return_pct:12,bench_return_pct:8}))},windows:[{label:'W1',cagr_pct:20,bench_cagr_pct:10,max_dd_pct:-12}]};
@@ -35,7 +36,7 @@ setTimeout(async()=>{
   get('trend').checked=false;get('trend').handlers.input();
   assert.match(get('candidate-status').textContent,/Refresh holdings/);
   assert.match(get('chart-mode').textContent,/Saved scenario/);
-  get('sip').value='20000';get('sip').handlers.input();
+  get('sip-input').value='20000';get('sip-input').handlers.input();
   assert.match(get('contributed-total').textContent,/₹/);
   console.log('Research UI interactions passed');
 },30);

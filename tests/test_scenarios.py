@@ -1,12 +1,21 @@
 import unittest
+from datetime import datetime, timezone
 
 import pandas as pd
 
 from alpha_strategy.backtest_momentum import MomentumResult
-from jobs.build_scenarios import monthly_path
+from jobs.build_scenarios import completed_sessions, monthly_path
 
 
 class ScenarioCacheTest(unittest.TestCase):
+    def test_incomplete_india_session_is_excluded(self):
+        dates = pd.to_datetime(["2026-09-30", "2026-10-01"])
+        data = {"^NSEI": pd.DataFrame({"Close": [100, 105]}, index=dates)}
+        morning = completed_sessions(data, datetime(2026, 10, 1, 6, 0, tzinfo=timezone.utc))
+        evening = completed_sessions(data, datetime(2026, 10, 1, 11, 0, tzinfo=timezone.utc))
+        self.assertEqual(len(morning["^NSEI"]), 1)
+        self.assertEqual(len(evening["^NSEI"]), 2)
+
     def test_partial_month_uses_latest_observed_date(self):
         dates = pd.to_datetime(["2026-08-28", "2026-09-28", "2026-09-30"])
         result = MomentumResult(

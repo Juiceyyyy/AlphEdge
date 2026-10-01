@@ -13,6 +13,10 @@
     n_hold: Number($("holdings").value)
   });
   const settingsKey = s => [Number(s.trend_filter), Number(s.stock_filter), s.n_hold].join("/");
+  const amount = id => {
+    const value=Number($(id+"-input").value);
+    return Number.isFinite(value) ? Math.min(Math.max(0,value),1e10) : 0;
+  };
   const message = (text, error=false) => {
     $("scenario-message").textContent = text;
     $("scenario-message").classList.toggle("error", error);
@@ -44,10 +48,10 @@
       message("Select a period within the saved historical data, with From before Through.", true);
       return;
     }
-    let strategy = Number($("lump").value);
+    let strategy = amount("lump");
     let benchmark = strategy;
     let contributed = strategy;
-    const sip = Number($("sip").value);
+    const sip = amount("sip");
     const points = [{date:chosen[0]?.date || "", strategy, benchmark}];
     chosen.forEach((m, i) => {
       strategy = (strategy + sip) * (1 + Number(m.strategy_return || 0));
@@ -99,8 +103,8 @@
   }
 
   function updateIllustration() {
-    setText("lump-value",money($("lump").value));
-    setText("sip-value",money($("sip").value));
+    setText("lump-value",money(amount("lump")));
+    setText("sip-value",money(amount("sip")));
     setText("holdings-value",$("holdings").value+" stocks");
     if (!overview) return;
     const key = settingsKey(settings());
@@ -242,7 +246,13 @@
     } finally {button.disabled=false;button.innerHTML='Calculate current candidates <span aria-hidden="true">→</span>';}
   }
 
-  ["lump","sip","start-month","end-month"].forEach(id=>$(id).addEventListener("input",updateIllustration));
+  ["lump","sip"].forEach(id=>{
+    $(id).addEventListener("input",()=>{$(id+"-input").value=$(id).value;updateIllustration();});
+    $(id+"-input").addEventListener("input",()=>{
+      $(id).value=Math.min(amount(id),Number($(id).max));updateIllustration();
+    });
+  });
+  ["start-month","end-month"].forEach(id=>$(id).addEventListener("input",updateIllustration));
   ["trend","stock","holdings"].forEach(id=>$(id).addEventListener("input",()=>{
     updateIllustration();setPending();
   }));

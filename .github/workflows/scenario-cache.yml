@@ -7,6 +7,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/scenario-cache.yml'
+      - 'jobs/build_scenarios.py'
 permissions:
   contents: write
 concurrency:

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -25,13 +26,24 @@ def monthly_path(result):
             for i, date in enumerate(equity.index)]
 
 
+def completed_sessions(data, now=None):
+    """Exclude an in-progress India trading day from historical scenarios."""
+    local_now = (now or datetime.now(timezone.utc)).astimezone(ZoneInfo("Asia/Kolkata"))
+    if local_now.hour >= 16:
+        return data
+    today = local_now.date()
+    return {symbol: frame[frame.index.date < today]
+            for symbol, frame in data.items()}
+
+
 def build(path="state/scenarios.json"):
     cfg = StrategyConfig.from_yaml("config.yaml")
     cfg.starting_capital = 1_000_000
     universe = get_constituent_universe(cfg.index_universe, cache_dir=Path("cache"),
                                         max_age_days=cfg.universe_refresh_days)
     symbols = [to_yahoo_symbol(s) for s in universe] + [cfg.benchmark_ticker]
-    data = download_history(symbols, years=15, cache_dir=cfg.data_cache_dir)
+    data = completed_sessions(download_history(symbols, years=15,
+                                                cache_dir=cfg.data_cache_dir))
     variants = {}
     for trend in (True, False):
         for stock in (True, False):
@@ -52,6 +64,7 @@ def build(path="state/scenarios.json"):
                 variants[key] = {"months": monthly_path(result), "kpis": result.kpis()}
                 print(f"Built {key}: {len(variants[key]['months'])} monthly points", flush=True)
     payload = {"computed_at": datetime.now(timezone.utc).isoformat(),
+               "data_through": data[cfg.benchmark_ticker].index.max().strftime("%Y-%m-%d"),
                "method": "Historical backtests with shared market data and today's constituent universe. Selected model; not independent out-of-sample validation.",
                "variants": variants}
     target = Path(path)
