@@ -1,6 +1,6 @@
-# AlphEdge - max-Sharpe momentum config (LOCKED winner)
-# 15-year backtest: CAGR 40.69% / Max DD -20.91% / Sharpe 1.93 / Calmar 1.95
-# Walk-forward verified: 24/24 rolling 3y windows positive alpha (100%)
+# AlphEdge - historically selected momentum configuration.
+# Saved baseline simulation: CAGR 40.69% / Max DD -20.91% / Sharpe 1.93 / Calmar 1.95.
+# Rolling windows reuse this selection; they do not establish independent out-of-sample results.
 
 # Capital
 starting_capital: 10000
@@ -40,4 +40,3 @@ commission_bps: 3
 data_cache_dir: cache/ohlcv
 state_dir: state
 log_dir: logs
-
