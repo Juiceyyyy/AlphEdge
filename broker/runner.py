@@ -14,6 +14,9 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from alpha_strategy.config import StrategyConfig, load_env
+from alpha_strategy.data import download_history
+from alpha_strategy.universe import to_yahoo_symbol
+from jobs.build_scenarios import completed_sessions
 from dashboard.explorer import _current_candidates
 from .kite import KiteClient
 
@@ -39,12 +42,71 @@ def _write(path, payload):
     os.replace(temporary, path)
 
 
+def _quarter(today):
+    return f"{today.year}-Q{(today.month - 1) // 3 + 1}"
+
+
+def _check_cadence(today):
+    months = {int(m.strip()) for m in os.getenv("REBALANCE_MONTHS", "3,6,9,12").split(",")}
+    if today.month not in months or any(m < 1 or m > 12 for m in months):
+        raise RuntimeError("Quarterly rebalance is outside the configured earnings review months")
+    for journal in STATE.glob("execution_*.json"):
+        record = _json(journal, {})
+        if record.get("status") == "complete" and record.get("quarter") == _quarter(today):
+            raise RuntimeError("A rebalance already completed this quarter")
+
+
+def _check_earnings(targets, today):
+    if os.getenv("EARNINGS_GATE", "required").lower() != "required":
+        return {}
+    dates = _json(STATE / "earnings_clearance.json", {})
+    selected = {}
+    for symbol in targets:
+        try:
+            released = date.fromisoformat(dates[symbol])
+        except (KeyError, ValueError, TypeError):
+            raise RuntimeError(f"Record and review {symbol}'s latest earnings release date before planning")
+        if not 0 <= (today - released).days <= 120:
+            raise RuntimeError(f"{symbol}'s earnings clearance is outside the last 120 days")
+        selected[symbol] = released.isoformat()
+    return selected
+
+
+def _reference_prices(client, symbols, today):
+    if os.getenv("BROKER_QUOTE_SOURCE", "public").lower() == "broker":
+        quotes = client.ltp(symbols)
+        return {s: float(quotes[f"NSE:{s}"]["last_price"]) for s in symbols}
+    raw = completed_sessions(download_history([to_yahoo_symbol(s) for s in symbols] + ["^NSEI"],
+                                              years=1, cache_dir=Path("cache/ohlcv"), refresh_days=0))
+    benchmark = raw.get("^NSEI")
+    if benchmark is None or benchmark.empty:
+        raise RuntimeError("Public reference prices unavailable")
+    session = benchmark.index.max()
+    if (today - session.date()).days > 4:
+        raise RuntimeError("Public reference price date is stale")
+    prices = {}
+    for symbol in symbols:
+        frame = raw.get(to_yahoo_symbol(symbol))
+        if frame is None or frame.empty or session not in frame.index:
+            raise RuntimeError(f"No matching public close for {symbol}")
+        prices[symbol] = float(frame.loc[session, "Close"])
+    return prices
+
+
+def _limit_price(side, reference):
+    # A resting limit caps a buy and sets a floor for a sale. No market order
+    # can slip beyond the user's chosen bound when using delayed free prices.
+    bound = reference * (1.01 if side == "BUY" else .99)
+    return round((math.floor(bound / .05) if side == "BUY" else math.ceil(bound / .05)) * .05, 2)
+
+
 def build_plan(client):
     cfg = StrategyConfig.from_yaml("config.yaml")
     basket = _current_candidates(cfg.use_trend_filter, cfg.require_above_ma, cfg.n_hold)
     today = datetime.now(IST).date()
     if (today - date.fromisoformat(basket["date"])).days > 4:
         raise RuntimeError("Model price date is stale; no plan generated")
+    _check_cadence(today)
     cap = _positive_limit("MAX_CAPITAL_INR")
     per_order = _positive_limit("MAX_ORDER_NOTIONAL_INR")
     managed = set(_json(STATE / "managed_symbols.json", []))
@@ -54,8 +116,8 @@ def build_plan(client):
     symbols = sorted(target_symbols | managed)
     if not symbols:
         raise RuntimeError("No target or managed positions to review")
-    quotes = client.ltp(symbols)
-    prices = {s: float(quotes[f"NSE:{s}"]["last_price"]) for s in symbols}
+    clearance = _check_earnings(target_symbols, today)
+    prices = _reference_prices(client, symbols, today)
     if any(not math.isfinite(p) or p <= 0 for p in prices.values()):
         raise RuntimeError("Invalid broker quotes")
     targets = {p["ticker"].removesuffix(".NS"): math.floor(cap * p["weight"] / prices[p["ticker"].removesuffix(".NS")])
@@ -78,6 +140,8 @@ def build_plan(client):
         raise RuntimeError("Turnover exceeds 125% of configured capital")
     plan = {"created_at": datetime.now(timezone.utc).isoformat(), "price_date": basket["date"],
             "capital_limit": cap, "risk_on": basket["risk_on"], "orders": orders,
+            "quarter": _quarter(today), "earnings_clearance": clearance,
+            "reference_source": os.getenv("BROKER_QUOTE_SOURCE", "public"),
             "managed_symbols": sorted(managed), "target_symbols": sorted(target_symbols)}
     plan["id"] = hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()[:16]
     return plan
@@ -106,10 +170,11 @@ def execute(client, plan, confirmation):
         symbol = order["symbol"]
         if order["side"] == "SELL" and current.get(symbol, 0) < order["quantity"]:
             raise RuntimeError(f"Insufficient {symbol} holdings")
-    journal = {"plan_id": plan["id"], "started_at": now.isoformat(), "orders": [], "status": "started"}
+    _check_cadence(now.date())
+    journal = {"plan_id": plan["id"], "quarter": plan["quarter"], "started_at": now.isoformat(), "orders": [], "status": "started"}
     _write(journal_path, journal)
     for order in sorted(plan["orders"], key=lambda o: o["side"] != "SELL"):
-        quote = float(client.ltp([order["symbol"]])[f"NSE:{order['symbol']}"]["last_price"])
+        quote = _reference_prices(client, [order["symbol"]], now.date())[order["symbol"]]
         if abs(quote / order["quote"] - 1) > 0.02:
             raise RuntimeError(f"{order['symbol']} quote moved more than 2%; stop and replan")
         if order["side"] == "BUY":
@@ -119,7 +184,8 @@ def execute(client, plan, confirmation):
         # Journal intent before sending: an ambiguous network failure must never auto-retry.
         entry = {**order, "status": "submitting"}
         journal["orders"].append(entry); _write(journal_path, journal)
-        order_id = client.place(order["side"], order["symbol"], order["quantity"], tag="MAT" + plan["id"][:12])
+        order_id = client.place(order["side"], order["symbol"], order["quantity"],
+                                tag="MAT" + plan["id"][:12], limit_price=_limit_price(order["side"], quote))
         entry.update(order_id=order_id, status="submitted"); _write(journal_path, journal)
         # Placement is not a fill. Stop for manual reconciliation on any open or rejected order.
         history = client.order_history(order_id)

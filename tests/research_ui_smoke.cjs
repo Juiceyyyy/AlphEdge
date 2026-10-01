@@ -19,7 +19,7 @@ let requests=0;
 const fetch=async url=>{requests++;return{ok:true,json:async()=>url.endsWith('/scenarios')?paths:manifest}};
 const buttons=['12','36','60','120','all'].map(p=>Object.assign(new Element(),{dataset:{period:p}}));
 const document={getElementById:get,querySelectorAll:()=>buttons,createElement:()=>new Element(),createElementNS:()=>new Element()};
-vm.runInNewContext(fs.readFileSync('dashboard/explorer.js','utf8'),{document,fetch,Intl,Number,Math,Array,Error,setInterval:()=>{},Date});
+vm.runInNewContext(fs.readFileSync('dashboard/explorer.js','utf8'),{document,window:{ALPHEDGE_STATIC:false},fetch,Intl,Number,Math,Array,Error,setInterval:()=>{},Date});
 setTimeout(()=>{
  assert.equal(get('kpi-cagr').textContent,'22.00%');
  assert.equal(get('annual-results').children.length,1);

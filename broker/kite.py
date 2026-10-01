@@ -41,14 +41,14 @@ class KiteClient:
     def ltp(self, tickers):
         return self.request("GET", "/quote/ltp", params=[("i", f"NSE:{symbol}") for symbol in tickers])
 
-    def place(self, side, symbol, quantity, *, tag):
-        if side not in ("BUY", "SELL") or quantity <= 0:
+    def place(self, side, symbol, quantity, *, tag, limit_price):
+        if side not in ("BUY", "SELL") or quantity <= 0 or limit_price <= 0:
             raise ValueError("Invalid order")
         result = self.request("POST", "/orders/regular", data={
             "exchange": "NSE", "tradingsymbol": symbol,
-            "transaction_type": side, "order_type": "MARKET",
+            "transaction_type": side, "order_type": "LIMIT", "price": limit_price,
             "quantity": quantity, "product": "CNC", "validity": "DAY",
-            "market_protection": -1, "tag": tag,
+            "tag": tag,
         })
         return result["order_id"]
 
