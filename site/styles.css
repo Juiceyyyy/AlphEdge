@@ -43,8 +43,6 @@ h2,h3,h4,p{margin-top:0}h2{font:800 clamp(28px,3vw,40px)/1.2 Manrope,sans-serif;
 .draw-path{animation:line-reveal 1.4s cubic-bezier(.2,.75,.2,1) both}
 @media(prefers-reduced-motion:reduce){.draw-path{animation:none}.path-pending{stroke-dasharray:none;stroke-dashoffset:0;opacity:1}}
 @media(max-width:650px){
-  .topbar nav{display:flex;gap:20px;font-size:12px}
-  .topbar nav a{font-size:12px;min-height:36px;display:inline-flex;align-items:center}
   .brand{min-width:0;font-size:15px}.brand-mark{height:32px;width:32px}
   .hero{padding:46px 0 58px}.hero h1{font-size:clamp(34px,9vw,42px);line-height:1.13}.lead{font-size:15px;line-height:1.65}
   .hero-actions{flex-wrap:wrap;gap:16px}.hero-actions .button{width:100%;justify-content:center}
@@ -65,15 +63,12 @@ h2,h3,h4,p{margin-top:0}h2{font:800 clamp(28px,3vw,40px)/1.2 Manrope,sans-serif;
   .method-grid{grid-template-columns:1fr;gap:16px}.method-grid h3{margin:9px 0 5px}
   .period-pills button{min-height:40px}.chart-card,.backtest-detail,.holdings-card{padding:16px}
 }
-/* The mobile header exposes every section without a hidden horizontal menu. */
+/* Keep the mobile header focused on the brand and broker setup. */
 .explorer-grid>*,.holdings-layout>*,.results,.card,.section-top>div{min-width:0}
 @media(max-width:820px){
-  .topbar nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;overflow:visible;border-top:1px solid var(--line);padding:10px 0 0}
-  .topbar nav a{justify-content:center;text-align:center;white-space:normal;line-height:1.2}
+  .topbar nav{display:none}
 }
 @media(max-width:650px){
-  .topbar nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 8px}
-  .topbar nav a{min-height:39px;padding:5px 7px;border-radius:7px;background:#142022;font-size:12px}
   .topbar .nav-cta{font-size:12px}
   .section-top{align-items:flex-start;flex-direction:column;gap:8px;margin-bottom:23px}
   .source-label{display:block;white-space:normal;line-height:1.4}
