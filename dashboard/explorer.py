@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
 from fastapi import APIRouter
@@ -14,7 +15,7 @@ from alpha_strategy.momentum import benchmark_in_uptrend, rank_universe
 from alpha_strategy.universe import get_constituent_universe, rank_by_adtv, to_yahoo_symbol
 
 from .app_data import read_json
-from .store import read_snapshot
+from .store import read_remote_json
 
 ROOT = Path(__file__).resolve().parent.parent
 ASSETS = Path(__file__).resolve().parent
@@ -39,21 +40,39 @@ def logo():
     return FileResponse(ASSETS / "logo.svg", media_type="image/svg+xml")
 
 
+PUBLIC_STATE = "https://raw.githubusercontent.com/Juiceyyyy/AlphEdge/main/state/"
+
+
+def cached_asset(name, fallback):
+    """Use the newest public committed cache, retaining the bundled version on outage."""
+    remote = read_remote_json(PUBLIC_STATE + name)
+    return remote if isinstance(remote, dict) and remote else read_json(ROOT / "state" / name, fallback)
+
+
 @router.get("/api/explore")
 def overview():
-    """Small manifest; large scenario data loads separately and cannot block this view."""
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        snapshot_future = pool.submit(cached_asset, "current_snapshot.json", None)
+        research_future = pool.submit(cached_asset, "research_cache.json", {})
+        holdings_future = pool.submit(cached_asset, "holdings_cache.json", {})
+        snapshot = snapshot_future.result()
+        research = research_future.result()
+        holdings = holdings_future.result()
     return {
-        "snapshot": read_json(ROOT / "state/current_snapshot.json", None) or read_snapshot(),
+        "snapshot": snapshot,
         "backtest": read_json(ROOT / "state/winner_max_sharpe.json", {}),
         "windows": read_json(ROOT / "state/walk_forward.json", {}).get("windows_3y", []),
         "rolling_windows": read_json(ROOT / "state/walk_forward.json", {}).get("rolling_3y_step_6m", []),
-        "research": read_json(ROOT / "state/research_cache.json", {}),
-        "holdings": read_json(ROOT / "state/holdings_cache.json", {}),
+        "research": research,
+        "holdings": holdings,
     }
 
 
 @router.get("/api/explore/scenarios")
 def scenarios():
+    remote = read_remote_json(PUBLIC_STATE + "scenarios.json")
+    if isinstance(remote, dict) and remote.get("variants"):
+        return remote
     path = ROOT / "state/scenarios.json"
     if not path.is_file():
         return {"variants": {}}
