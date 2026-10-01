@@ -19,7 +19,7 @@ Object.assign(get('holdings'),{value:'10'});
 const overview={backtest:{kpis:{cagr_pct:40.69,max_drawdown_pct:-20.91,sharpe:1.93,benchmark_cagr_pct:10.11},yearly:Array.from({length:14},(_,i)=>({year:2012+i,return_pct:12,bench_return_pct:8}))},windows:[{label:'W1',cagr_pct:20,bench_cagr_pct:10,max_dd_pct:-12}]};
 const basket={date:'2026-09-25',computed_at:'2026-09-29T12:00:00Z',risk_on:true,positions:[{ticker:'TEST.NS',weight:.6},{ticker:'EXAMPLE.NS',weight:.4}]};
 const scenario={kpis:{cagr_pct:22,max_drawdown_pct:-18},months:Array.from({length:36},(_,i)=>({date:`2023-${String(i%12+1).padStart(2,'0')}-28`,strategy_return:.01,benchmark_return:.005}))};
-overview.scenarios={computed_at:'2026-09-29T12:00:00Z',variants:{'1/1/10':scenario,'0/1/10':scenario}};
+overview.scenarios={computed_at:'2026-09-29T12:00:00Z',variants:{'1/1/10':scenario,'0/1/10':scenario,'0/1/6':scenario}};
 overview.rolling_windows=[{start:'2020-01-01',end:'2022-12-31',cagr_pct:20,bench_cagr_pct:10,max_dd_pct:-12}];
 overview.snapshot={price_date:'2026-09-25',forward:[{date:'2026-09-25',model_index:100,benchmark_index:100}],basket};
 let requests=0;
@@ -36,6 +36,7 @@ setTimeout(async()=>{
   assert.equal(get('candidate-positions').children[0].children[1].textContent,'60.0%');
   const before=requests;
   get('trend').checked=false;get('trend').handlers.input();
+  get('holdings').value='6';get('holdings').handlers.input();
   assert.match(get('candidate-status').textContent,/Refresh holdings/);
   assert.match(get('chart-mode').textContent,/Saved scenario/);
   get('sip-input').value='20000';get('sip-input').handlers.input();

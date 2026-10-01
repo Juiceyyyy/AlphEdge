@@ -47,7 +47,7 @@ def build(path="state/scenarios.json"):
     variants = {}
     for trend in (True, False):
         for stock in (True, False):
-            for count in (5, 10, 15):
+            for count in range(5, 16):
                 mc = MomentumConfig(
                     rebalance_freq="M", n_hold=count,
                     lookback_short=cfg.lookback_short, lookback_long=cfg.lookback_long,
