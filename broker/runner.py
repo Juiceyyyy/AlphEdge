@@ -150,6 +150,8 @@ def build_plan(client):
 def execute(client, plan, confirmation):
     if os.getenv("TRADING_ENABLED", "false").lower() != "true":
         raise RuntimeError("TRADING_ENABLED must be true in the local runner")
+    if os.getenv("BROKER_IP_CONFIRMED", "false").lower() != "true":
+        raise RuntimeError("Confirm this machine uses the broker-registered static IP")
     unsigned = {key: value for key, value in plan.items() if key != "id"}
     digest = hashlib.sha256(json.dumps(unsigned, sort_keys=True).encode()).hexdigest()[:16]
     if confirmation != plan["id"] or digest != plan["id"]:
