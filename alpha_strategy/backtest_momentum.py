@@ -172,20 +172,22 @@ def run_momentum_backtest(cfg: StrategyConfig,
                           years: int | None = None,
                           top_n: int | None = None,
                           mc: MomentumConfig | None = None,
-                          verbose: bool = True) -> MomentumResult:
+                          verbose: bool = True,
+                          prepared_data: dict[str, pd.DataFrame] | None = None,
+                          prepared_universe: list[str] | None = None) -> MomentumResult:
     yrs = years or cfg.data_lookback_years
     top = top_n or cfg.top_n_by_adtv
     if mc is None:
         mc = _resolve_momentum_cfg(cfg)
 
-    nse = get_constituent_universe(cfg.index_universe, cache_dir=Path("cache"),
-                                    max_age_days=cfg.universe_refresh_days)
+    nse = prepared_universe if prepared_universe is not None else get_constituent_universe(
+        cfg.index_universe, cache_dir=Path("cache"), max_age_days=cfg.universe_refresh_days)
     yahoo = [to_yahoo_symbol(s) for s in nse]
     if verbose:
         log.info("Momentum BT universe: %d candidates, top-%d by ADTV", len(yahoo), top)
 
-    raw = download_history(yahoo + [cfg.benchmark_ticker], years=yrs,
-                           cache_dir=cfg.data_cache_dir)
+    raw = dict(prepared_data) if prepared_data is not None else download_history(
+        yahoo + [cfg.benchmark_ticker], years=yrs, cache_dir=cfg.data_cache_dir)
     bench_df = raw.pop(cfg.benchmark_ticker, None)
     bench_close = bench_df["Close"] if bench_df is not None and not bench_df.empty else None
 
@@ -440,4 +442,3 @@ def run_momentum_backtest(cfg: StrategyConfig,
         trades=trades, holdings_history=holdings_history,
         config={**cfg.to_dict(), **{f"momentum_{k}": v for k, v in mc.__dict__.items()}},
     )
-

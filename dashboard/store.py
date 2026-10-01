@@ -15,6 +15,15 @@ def _remote_snapshot(url, five_minute_window):
         return json.load(response)
 
 
+def read_remote_json(url):
+    if not url:
+        return None
+    try:
+        return _remote_snapshot(url, int(time() // 300))
+    except (OSError, ValueError):
+        return None
+
+
 @contextmanager
 def connection():
     url = os.getenv("DATABASE_URL")
@@ -38,10 +47,7 @@ def initialize():
 def read_snapshot(name="daily"):
     remote_url = os.getenv("RESEARCH_SNAPSHOT_URL")
     if name == "daily" and remote_url:
-        try:
-            return _remote_snapshot(remote_url, int(time() // 300))
-        except (OSError, ValueError):
-            return None
+        return read_remote_json(remote_url)
     snapshot_path = os.getenv("RESEARCH_SNAPSHOT_FILE")
     if name == "daily" and snapshot_path:
         snapshot_file = Path(snapshot_path)

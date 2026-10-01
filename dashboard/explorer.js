@@ -5,7 +5,7 @@
     style:"currency", currency:"INR", maximumFractionDigits:0
   }).format(Number(n) || 0);
   const pct = n => (Number(n) || 0).toFixed(2) + "%";
-  let overview, scenarioMonths = null, activeSettings = "1/1/10";
+  let overview, datesInitialized = false;
 
   const settings = () => ({
     trend_filter: $("trend").checked,
@@ -36,8 +36,14 @@
   }
 
   function replay(months) {
-    const years = Number($("horizon").value);
-    const chosen = months.slice(-years * 12);
+    const first = $("start-month").value, last = $("end-month").value;
+    const chosen = months.filter(m => m.date.slice(0,7) >= first && m.date.slice(0,7) <= last);
+    if (!chosen.length) {
+      ["strategy-total","benchmark-total","contributed-total","chart-period"].forEach(id=>setText(id,"—"));
+      $("growth-chart").replaceChildren();
+      message("Select a period within the saved historical data, with From before Through.", true);
+      return;
+    }
     let strategy = Number($("lump").value);
     let benchmark = strategy;
     let contributed = strategy;
@@ -95,19 +101,56 @@
   function updateIllustration() {
     setText("lump-value",money($("lump").value));
     setText("sip-value",money($("sip").value));
-    setText("horizon-value",$("horizon").value+" years");
     setText("holdings-value",$("holdings").value+" stocks");
     if (!overview) return;
-    replay(scenarioMonths || baselineMonths());
+    const key = settingsKey(settings());
+    const variant = overview.scenarios?.variants?.[key];
+    if (!datesInitialized) {
+      const source = variant?.months?.length ? variant.months : baselineMonths();
+      if (source.length) {
+        const last = source.at(-1).date.slice(0,7);
+        const first = source[0].date.slice(0,7);
+        const [year, month] = last.split("-");
+        $("start-month").min = first; $("end-month").min = first;
+        $("start-month").max = last; $("end-month").max = last;
+        $("start-month").value = `${Math.max(Number(year)-10,Number(first.slice(0,4)))}-${month}`;
+        $("end-month").value = last;
+        datesInitialized = true;
+      }
+    }
+    if (variant?.months?.length) {
+      const k=variant.kpis;
+      setText("kpi-cagr",pct(k.cagr_pct));setText("kpi-drawdown",pct(k.max_drawdown_pct));
+      setText("kpi-sharpe",Number(k.sharpe||0).toFixed(2));
+      setText("kpi-benchmark",pct(k.benchmark_cagr_pct));
+      setText("kpi-source",`Saved ${$("holdings").value}-stock scenario · ${k.start}–${k.end}`);
+      setText("chart-mode", "Saved scenario · " + key.replaceAll("/", " · "));
+      setText("chart-detail", `Monthly backtest checkpoints · generated ${overview.scenarios.computed_at.slice(0,10)}`);
+      replay(variant.months);
+      message(`Showing the saved ${$("holdings").value}-stock historical run. Rules and investment inputs update the chart instantly. Historical CAGR ${pct(variant.kpis.cagr_pct)}; maximum drawdown ${pct(variant.kpis.max_drawdown_pct)}.`);
+    } else if (key === "1/1/10") {
+      const k=overview.backtest.kpis;
+      setText("kpi-cagr",pct(k.cagr_pct));setText("kpi-drawdown",pct(k.max_drawdown_pct));
+      setText("kpi-sharpe",Number(k.sharpe||0).toFixed(2));
+      setText("kpi-benchmark",pct(k.benchmark_cagr_pct));
+      setText("kpi-source",`Saved baseline · ${k.start || "2011"}–${k.end || "2026"}`);
+      setText("chart-mode", "Saved annual baseline");
+      setText("chart-detail", "Illustrative monthly values from annual results");
+      replay(baselineMonths());
+      message("The monthly scenario cache is pending. This default chart spreads annual returns evenly over each year; it is an illustration.");
+    } else {
+      setText("chart-mode", "Scenario cache pending");
+      message("This historical scenario is not available yet. The weekly cache build is pending; return to the default filters and 10 stocks for the saved baseline.", true);
+      $("growth-chart").replaceChildren();
+      ["strategy-total","benchmark-total","contributed-total","chart-period"].forEach(id=>setText(id,"—"));
+    }
   }
 
   function setPending() {
-    if (settingsKey(settings()) !== activeSettings) {
-      $("chart-mode").textContent = "Previous settings";
-      message("Strategy rules changed. Select Recalculate backtest to see a result using these settings.");
-    }
-    setText("candidate-status","Settings changed. Refresh holdings to calculate this model basket.");
-    $("candidate-positions").replaceChildren();
+    if(settingsKey(settings()) !== "1/1/10")
+      setText("candidate-status","Showing the daily baseline basket. Select Refresh holdings to calculate the chosen rules.");
+    else if(overview?.snapshot)
+      setText("candidate-status",`Daily baseline · prices through ${overview.snapshot.price_date}`);
   }
 
   function renderForward(rows) {
@@ -132,19 +175,25 @@
   }
 
   function renderResearchTables(data) {
-    const annual = $("annual-results"), windows = $("window-results");
+    const annual = $("annual-results"), windows = $("window-results"), rolling = $("rolling-results");
     const row = (target, cells) => {
       const tr = document.createElement("tr");
       cells.forEach(value => { const td = document.createElement("td"); td.textContent = value; tr.append(td); });
       target.append(tr);
     };
-    annual.replaceChildren(); windows.replaceChildren();
+    annual.replaceChildren(); windows.replaceChildren(); rolling.replaceChildren();
     (data.backtest.yearly || []).forEach(x => row(annual,
       [x.year, pct(x.return_pct), pct(x.bench_return_pct)]));
     (data.windows || []).forEach(x => row(windows,
       [x.label || `${x.start} – ${x.end}`, pct(x.cagr_pct), pct(x.bench_cagr_pct), pct(x.max_dd_pct)]));
+    (data.rolling_windows || []).forEach(x => row(rolling,
+      [`${x.start} – ${x.end}`, pct(x.cagr_pct), pct(x.bench_cagr_pct), pct(x.max_dd_pct)]));
+    const periods = data.windows || [];
+    const beats = periods.filter(x => x.cagr_pct > x.bench_cagr_pct).length;
+    setText("walkforward-summary", `${beats} of ${periods.length} consecutive periods exceeded Nifty 50 · ${rolling.childElementCount} overlapping windows available`);
     if (!annual.childElementCount) row(annual, ["No saved results", "—", "—"]);
     if (!windows.childElementCount) row(windows, ["No saved windows", "—", "—", "—"]);
+    if (!rolling.childElementCount) row(rolling, ["No saved rolling windows", "—", "—", "—"]);
   }
 
   function position(list,ticker,weight,caption) {
@@ -170,23 +219,6 @@
     } finally { clearTimeout(timer); }
   }
 
-  async function recalculate() {
-    const button=$("recalculate"), chosen=settings(); button.disabled=true;
-    button.textContent="Calculating historical strategy…";
-    message("Fetching prices and running the historical strategy. This can take several minutes on a cold server.");
-    try {
-      const data=await post("/api/explore/scenario",chosen);
-      scenarioMonths=data.months;activeSettings=settingsKey(chosen);
-      setText("chart-mode","Recomputed strategy");
-      setText("chart-detail","Monthly checkpoints from a fresh backtest");
-      updateIllustration();
-      message(`Recomputed ${chosen.n_hold}-stock strategy. Historical CAGR ${pct(data.kpis.cagr_pct)}; maximum drawdown ${pct(data.kpis.max_drawdown_pct)}. This is simulated performance.`);
-      if(settingsKey(settings())!==activeSettings) setPending();
-    } catch(e) {
-      message(`Could not recalculate: ${e.name==="AbortError"?"the request timed out":e.message}. Saved baseline remains visible.`,true);
-    } finally {button.disabled=false;button.innerHTML='Recalculate backtest <span aria-hidden="true">→</span>';}
-  }
-
   async function calculateCandidates() {
     const button=$("calculate-candidates"), chosen=settings();
     button.disabled=true; button.textContent="Calculating candidates…";
@@ -210,33 +242,33 @@
     } finally {button.disabled=false;button.innerHTML='Calculate current candidates <span aria-hidden="true">→</span>';}
   }
 
-  ["lump","sip","horizon"].forEach(id=>$(id).addEventListener("input",updateIllustration));
+  ["lump","sip","start-month","end-month"].forEach(id=>$(id).addEventListener("input",updateIllustration));
   ["trend","stock","holdings"].forEach(id=>$(id).addEventListener("input",()=>{
     updateIllustration();setPending();
   }));
-  $("recalculate").addEventListener("click",recalculate);
   $("calculate-candidates").addEventListener("click",calculateCandidates);
   updateIllustration();
-  fetch("/api/explore").then(r=>{if(!r.ok)throw Error("Data unavailable");return r.json();})
+  function loadOverview() {
+    return fetch("/api/explore").then(r=>{if(!r.ok)throw Error("Data unavailable");return r.json();})
     .then(data=>{
-      overview=data;const k=data.backtest.kpis;
-      setText("kpi-cagr",pct(k.cagr_pct));
-      setText("kpi-drawdown",pct(k.max_drawdown_pct));
-      setText("kpi-sharpe",Number(k.sharpe||0).toFixed(2));
-      setText("kpi-benchmark",pct(k.benchmark_cagr_pct));
+      overview=data;
       if(data.snapshot){
         const snap=data.snapshot;
         renderForward(snap.forward || []);
         const basket=snap.basket;
-        setText("candidate-status",`Prices through ${basket.date} · ${basket.risk_on?"Invested model":"Cash allocation"} · Daily refresh`);
-        const list=$("candidate-positions");list.replaceChildren();
-        if(basket.positions.length) basket.positions.forEach(p=>position(list,p.ticker,p.weight,"Model target weight"));
-        else {const div=document.createElement("div");div.className="empty-state";div.textContent=basket.risk_on?"No eligible stocks with current data.":"Nifty trend filter indicates a 100% cash allocation.";list.append(div);}
+        if(settingsKey(settings()) === "1/1/10") {
+          setText("candidate-status",`Prices through ${basket.date} · ${basket.risk_on?"Invested model":"Cash allocation"} · Daily refresh`);
+          const list=$("candidate-positions");list.replaceChildren();
+          if(basket.positions.length) basket.positions.forEach(p=>position(list,p.ticker,p.weight,"Model target weight"));
+          else {const div=document.createElement("div");div.className="empty-state";div.textContent=basket.risk_on?"No eligible stocks with current data.":"Nifty trend filter indicates a 100% cash allocation.";list.append(div);}
+        }
       } else {
         setText("candidate-status","Daily research snapshot pending. Refresh holdings to calculate on demand.");
       }
       renderResearchTables(data);updateIllustration();
     })
     .catch(e=>message("Could not load saved research data: "+e.message,true));
+  }
+  loadOverview();
+  setInterval(loadOverview, 15 * 60 * 1000);
 })();
-

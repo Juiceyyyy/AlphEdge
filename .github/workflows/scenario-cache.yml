@@ -1,0 +1,36 @@
+name: Build scenario cache
+on:
+  schedule:
+    - cron: '23 13 * * 6' # Weekly Saturday, after the trading week.
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/scenario-cache.yml'
+permissions:
+  contents: write
+concurrency:
+  group: historical-scenario-cache
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Build historical scenarios
+        run: python -m jobs.build_scenarios
+      - name: Commit public scenarios
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add state/scenarios.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Refresh historical scenario cache"
+          git pull --rebase origin main
+          git push origin HEAD:main

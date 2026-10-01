@@ -6,6 +6,7 @@ actual backtest on demand; they never masquerade as precomputed results.
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -24,7 +25,7 @@ from alpha_strategy.momentum import benchmark_in_uptrend, rank_universe
 from alpha_strategy.universe import get_constituent_universe, rank_by_adtv, to_yahoo_symbol
 
 from .app_data import read_json
-from .store import read_snapshot
+from .store import read_snapshot, read_remote_json
 
 ROOT = Path(__file__).resolve().parent.parent
 ASSETS = Path(__file__).resolve().parent
@@ -53,16 +54,26 @@ def script():
     return FileResponse(ASSETS / "explorer.js", media_type="application/javascript")
 
 
+@router.get("/explore/logo.svg", include_in_schema=False)
+def logo():
+    return FileResponse(ASSETS / "logo.svg", media_type="image/svg+xml")
+
+
 @router.get("/api/explore")
 def overview():
     winner = read_json(ROOT / "state/winner_max_sharpe.json", {})
     wf = read_json(ROOT / "state/walk_forward.json", {})
     snapshot = read_snapshot()
+    scenario_url = os.getenv("RESEARCH_SCENARIOS_URL")
+    scenarios = (read_remote_json(scenario_url) if scenario_url else None) or read_json(
+        ROOT / "state/scenarios.json", {})
     return {
         "snapshot": snapshot,
         "backtest": {"kpis": winner.get("kpis", {}), "yearly": winner.get("yearly", [])},
         "windows": wf.get("windows_3y", []),
-        "method": "Saved historical backtest. Annual points are available before recalculation.",
+        "rolling_windows": wf.get("rolling_3y_step_6m", []),
+        "scenarios": scenarios,
+        "method": "Saved selected historical backtests. Rolling windows are not independent out-of-sample trials.",
     }
 
 
@@ -179,4 +190,3 @@ async def candidates(request: Scenario):
                                            int(time.time() // 900))
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Current candidates unavailable: {type(exc).__name__}") from exc
-

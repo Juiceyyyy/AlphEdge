@@ -15,3 +15,15 @@ h2,h3,h4,p{margin-top:0}h2{font:800 clamp(28px,3vw,40px)/1.2 Manrope,sans-serif;
 
 
 .forward-section{padding:0 0 88px}.forward-wrap{height:220px}.period-value{font-size:14px!important;line-height:2.1}.forward-section .totals{margin-top:0}@media(max-width:650px){.forward-section{padding-bottom:60px}.forward-wrap{height:170px}}
+
+/* AlphEdge's ascending line mark is shared by the header and favicon. */
+.brand-mark{display:block;height:36px;width:36px;flex:none;border-radius:10px;background:none;color:inherit}
+.date-range{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:9px}
+.date-range .control{margin-bottom:18px}
+.date-range label{display:block;margin-bottom:8px;font-size:12px;font-weight:700}
+.date-range input{width:100%;min-height:44px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#101c1d;color:var(--ink);color-scheme:dark}
+.window-summary{margin:20px 0;padding:15px 17px;border-left:3px solid var(--green);background:#172b26;color:#d7eae0;font-size:13px;font-weight:600}
+.rolling-detail{border-top:1px solid var(--line);margin-top:20px;padding-top:12px}
+.rolling-detail summary{cursor:pointer;min-height:44px;padding:10px 0;color:var(--green);font-size:13px;font-weight:700}
+.rolling-detail .table-scroll{margin-top:9px}
+@media(max-width:650px){.date-range{gap:8px}.window-summary{font-size:12px}}

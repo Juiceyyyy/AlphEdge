@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0a1012">
   <title>AlphEdge — Strategy research</title>
+  <link rel="icon" type="image/svg+xml" href="/explore/logo.svg">
   <link rel="stylesheet" href="/explore/styles.css">
   <script src="/explore/app.js" defer></script>
 </head>
@@ -12,8 +13,8 @@
   <a class="skip" href="#main">Skip to content</a>
   <header class="topbar">
     <div class="shell topbar-inner">
-      <a class="brand" href="/explore" aria-label="AlphEdge home"><span class="brand-mark">AE</span><span>AlphEdge</span><span class="brand-divider"></span><span class="brand-sub">Research lab</span></a>
-      <nav aria-label="Page sections"><a href="#explorer">Backtest</a><a href="#portfolio">Model holdings</a><a href="#methodology">Methodology</a></nav>
+      <a class="brand" href="/explore" aria-label="AlphEdge home"><img class="brand-mark" src="/explore/logo.svg" width="36" height="36" alt=""><span>AlphEdge</span><span class="brand-divider"></span><span class="brand-sub">Research lab</span></a>
+      <nav aria-label="Page sections"><a href="#explorer">Backtest</a><a href="#walkforward">Window review</a><a href="#portfolio">Model holdings</a><a href="#methodology">Methodology</a></nav>
     </div>
   </header>
 
@@ -31,7 +32,7 @@
     </section>
 
     <section class="shell summary" aria-labelledby="results-heading">
-      <div class="section-top"><div><span class="kicker">THE HISTORICAL RECORD</span><h2 id="results-heading">Backtest at a glance</h2></div><span class="source-label">Saved baseline · 2011–2026</span></div>
+      <div class="section-top"><div><span class="kicker">THE HISTORICAL RECORD</span><h2 id="results-heading">Backtest at a glance</h2></div><span id="kpi-source" class="source-label">Saved baseline · 2011–2026</span></div>
       <div class="stat-grid">
         <article class="stat"><span>Annualized return</span><strong id="kpi-cagr">—</strong><small>Simulated CAGR</small></article>
         <article class="stat"><span>Worst drawdown</span><strong id="kpi-drawdown">—</strong><small>Peak to trough</small></article>
@@ -47,29 +48,28 @@
           <div class="card-head"><h3>Set your scenario</h3><span class="chip">Adjustable</span></div>
           <div class="control"><div class="control-head"><label for="lump">Initial investment</label><output id="lump-value" for="lump">₹1,00,000</output></div><input type="range" id="lump" min="0" max="5000000" step="10000" value="100000"><div class="scale"><span>₹0</span><span>₹50L</span></div></div>
           <div class="control"><div class="control-head"><label for="sip">Monthly contribution</label><output id="sip-value" for="sip">₹10,000</output></div><input type="range" id="sip" min="0" max="100000" step="1000" value="10000"><div class="scale"><span>₹0</span><span>₹1L</span></div></div>
-          <div class="control"><div class="control-head"><label for="horizon">Lookback period</label><output id="horizon-value" for="horizon">10 years</output></div><input type="range" id="horizon" min="3" max="14" step="1" value="10"><div class="scale"><span>3 years</span><span>14 years</span></div></div>
+          <div class="date-range"><div class="control"><label for="start-month">From</label><input id="start-month" type="month" value="2016-01" min="2012-01"></div><div class="control"><label for="end-month">Through</label><input id="end-month" type="month" value="2025-12" min="2012-01"></div></div>
           <div class="rule"></div>
-          <div class="control-head strategy-label"><h4>Strategy rules</h4><span>Recalculation required</span></div>
+          <div class="control-head strategy-label"><h4>Strategy rules</h4><span>Instant saved scenarios</span></div>
           <label class="switch-row"><span><strong>Nifty 200-day trend filter</strong><small>Move to cash below the moving average</small></span><input id="trend" type="checkbox" checked role="switch"><span class="switch-ui" aria-hidden="true"></span></label>
           <label class="switch-row"><span><strong>Stock 200-day filter</strong><small>Only select stocks above their moving average</small></span><input id="stock" type="checkbox" checked role="switch"><span class="switch-ui" aria-hidden="true"></span></label>
-          <div class="control hold"><div class="control-head"><label for="holdings">Target holdings</label><output id="holdings-value" for="holdings">10 stocks</output></div><input type="range" id="holdings" min="5" max="15" step="1" value="10"></div>
-          <button id="recalculate" class="button dark" type="button">Recalculate backtest <span aria-hidden="true">→</span></button>
-          <p class="control-hint">Rule changes rerun the historical engine. The chart keeps the saved baseline until a fresh result is ready.</p>
+          <div class="control hold"><div class="control-head"><label for="holdings">Target holdings</label><output id="holdings-value" for="holdings">10 stocks</output></div><input type="range" id="holdings" min="5" max="15" step="5" value="10"><div class="scale"><span>5</span><span>10</span><span>15</span></div></div>
+          <p class="control-hint">The saved 5, 10 and 15-stock strategy paths switch instantly. Your deposit, monthly contribution and time range always redraw locally. The public scenario cache refreshes weekly.</p>
         </aside>
         <div class="results">
           <div class="chart-card card">
-            <div class="chart-header"><div><span class="kicker">HISTORICAL ILLUSTRATION</span><h3>How your contributions could have grown</h3></div><span id="chart-mode" class="mode">Saved annual results</span></div>
+            <div class="chart-header"><div><span class="kicker">HISTORICAL ILLUSTRATION</span><h3>How your contributions could have grown</h3></div><span id="chart-mode" class="mode">Loading saved paths</span></div>
             <div class="totals"><div><span>Strategy illustration</span><strong id="strategy-total">—</strong></div><div><span>Nifty illustration</span><strong id="benchmark-total">—</strong></div><div><span>Total contributed</span><strong id="contributed-total">—</strong></div></div>
             <div class="legend"><span><i class="key strategy-key"></i> Strategy</span><span><i class="key benchmark-key"></i> Nifty 50</span></div>
             <div class="chart-wrap"><svg id="growth-chart" viewBox="0 0 760 300" preserveAspectRatio="none" role="img" aria-label="Historical investment illustration chart"></svg></div>
             <div class="chart-footer"><span id="chart-period">—</span><span id="chart-detail">Monthly values estimated from saved annual returns</span></div>
           </div>
           <div class="backtest-detail card"><div class="card-head"><h3>Annual results</h3><span class="chip outline">Strategy vs Nifty 50</span></div><div class="table-scroll"><table><thead><tr><th>Year</th><th>Strategy</th><th>Nifty 50</th></tr></thead><tbody id="annual-results"></tbody></table></div></div>
-          <div class="backtest-detail card"><div class="card-head"><h3>Three-year windows</h3><span class="chip outline">Non-overlapping periods</span></div><div class="table-scroll"><table><thead><tr><th>Period</th><th>Strategy CAGR</th><th>Nifty CAGR</th><th>Drawdown</th></tr></thead><tbody id="window-results"></tbody></table></div><p class="table-note">These windows do not overlap, but they reuse the selected configuration. They are not independent out-of-sample evidence.</p></div>
+          <div class="backtest-detail card" id="walkforward"><div class="card-head"><div><span class="kicker">WINDOW REVIEW</span><h3>Walk-forward-style period review</h3></div><span class="chip outline">Saved baseline</span></div><p class="table-note">We split one selected historical backtest into consecutive three-year periods and 24 overlapping rolling windows. This checks performance across market regimes; it does not retrain on each fold or establish independent out-of-sample results.</p><div id="walkforward-summary" class="window-summary" aria-live="polite">Loading historical windows…</div><h4>Consecutive three-year periods</h4><div class="table-scroll"><table><thead><tr><th>Period</th><th>Strategy CAGR</th><th>Nifty CAGR</th><th>Drawdown</th></tr></thead><tbody id="window-results"></tbody></table></div><details class="rolling-detail"><summary>View all 24 rolling three-year windows</summary><div class="table-scroll"><table><thead><tr><th>Period</th><th>Strategy CAGR</th><th>Nifty CAGR</th><th>Drawdown</th></tr></thead><tbody id="rolling-results"></tbody></table></div></details></div>
           <div id="scenario-message" class="message" role="status" aria-live="polite">Historical illustrations are hypothetical. Monthly contributions are applied at the start of each month.</div>
         </div>
       </div>
-      <p class="disclosure">The initial chart distributes each saved year's return evenly across its months to illustrate contribution timing. It does not recover the actual monthly path. Recalculate to use a fresh historical run with monthly checkpoints. Changing your deposit changes the replayed balance, not the model rules.</p>
+      <p class="disclosure">Saved scenario paths use actual monthly backtest checkpoints when available. If the scenario cache is temporarily unavailable, only the default annual illustration is shown, with each year's return spread evenly across months. Changing investment inputs replays the selected return path without running a new backtest.</p>
     </div></section>
 
     <section class="shell portfolio-section" id="portfolio" aria-labelledby="portfolio-heading">
