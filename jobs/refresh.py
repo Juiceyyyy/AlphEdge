@@ -67,6 +67,7 @@ def refresh():
             raise RuntimeError("Rebalance data dates disagree; snapshot unchanged")
     else:
         basket = {**before, "date": date_string, "benchmark_close": benchmark_close,
+                  "computed_at": datetime.now(timezone.utc).isoformat(),
                   "positions": [{**p, "price": close, "weight": value / gross}
                                 for p, close, value in values]}
     snapshot = {"generated_at": datetime.now(timezone.utc).isoformat(),
