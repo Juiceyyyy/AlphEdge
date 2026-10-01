@@ -1,1 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title"><title id="title">AlphEdge — disciplined momentum</title><rect x="1" y="1" width="62" height="62" rx="15" fill="#0c2221" stroke="#28564b" stroke-width="2"/><path d="M9 37 30 25h8L55 13v19L33 47 9 37Z" fill="#85efbd"/><path d="M9 49 30 41l8-7 17 6-25 14-21-5Z" fill="#158666"/><path d="M20 38 34 43 50 31V23L34 37l-14 1Z" fill="#0c2221"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">AlphEdge</title>
+  <desc id="desc">A mint strategy path rising above a muted market benchmark.</desc>
+  <rect x="1" y="1" width="62" height="62" rx="15" fill="#0C191C" stroke="#315452" stroke-width="2"/>
+  <path d="M11 45 C22 43 32 43 53 40" fill="none" stroke="#65928C" stroke-width="4" stroke-linecap="round"/>
+  <path d="M11 51 L26 47 L34 39 L42 33 L53 17" fill="none" stroke="#8BF0BD" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="53" cy="17" r="3" fill="#B8FFD6"/>
+</svg>

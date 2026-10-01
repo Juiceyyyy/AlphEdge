@@ -8,11 +8,28 @@
     typeof requestAnimationFrame === 'function' &&
     !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const animations = new Map();
-  function metric(id, value, format, duration=650) {
+  const revealTasks = new Map();
+  const revealedCharts = new Set();
+  const revealObserver = typeof IntersectionObserver === 'function'
+    ? new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          const task = revealTasks.get(entry.target);
+          if(task){revealTasks.delete(entry.target);revealObserver.unobserve(entry.target);task();}
+        });
+      }, {threshold:.18}) : null;
+  function whenVisible(element, task) {
+    if (!motionOK() || !revealObserver) { task(); return; }
+    const box=element.getBoundingClientRect();
+    if(box.top < window.innerHeight*.9 && box.bottom > 0) {task();return;}
+    revealTasks.set(element, task);revealObserver.observe(element);
+  }
+  function metric(id, value, format, duration=1150) {
     const element=$(id), target=Number(value);
     if (!Number.isFinite(target)) { set(id,'—'); return; }
     if (!motionOK()) { set(id,format(target)); element.dataset.number=String(target); return; }
     const previous=animations.get(id); if(previous) cancelAnimationFrame(previous);
+    whenVisible(element, () => {
     const start=Number(element.dataset.number??0), begun=performance.now();
     function frame(now) {
       const progress=Math.min(1,(now-begun)/duration);
@@ -22,6 +39,7 @@
       else {element.dataset.number=String(target);animations.delete(id);}
     }
     animations.set(id,requestAnimationFrame(frame));
+    });
   }
 
   const key = (a,b,c) => `${Number(a)}/${Number(b)}/${Number(c)}`;
@@ -76,7 +94,12 @@
     }
     node(svg,'text',{x:left,y:height-6,fill:'#a2b6b2','font-size':11},rows[0].date.slice(0,7));
     node(svg,'text',{x:width-right,y:height-6,fill:'#a2b6b2','font-size':11,'text-anchor':'end'},rows.at(-1).date.slice(0,7));
-    fields.slice().reverse().forEach((field,i)=>node(svg,'path',{d:rows.map((r,j)=>`${j?'L':'M'}${x(j).toFixed(1)},${y(r[field]).toFixed(1)}`).join(' '),fill:'none',stroke:i?'#67d7ad':'#82979b','stroke-width':i?3:2,'stroke-linecap':'round','stroke-linejoin':'round',pathLength:1,class:motionOK()?'draw-path':''}));
+    const animate=motionOK() && !revealedCharts.has(element);
+    const paths=fields.slice().reverse().map((field,i)=>node(svg,'path',{d:rows.map((r,j)=>`${j?'L':'M'}${x(j).toFixed(1)},${y(r[field]).toFixed(1)}`).join(' '),fill:'none',stroke:i?'#67d7ad':'#82979b','stroke-width':i?3:2,'stroke-linecap':'round','stroke-linejoin':'round',pathLength:1,class:animate?'path-pending':''}));
+    if(animate) whenVisible(svg,()=>{
+      revealedCharts.add(element);
+      paths.forEach((path,i)=>{path.classList.remove('path-pending');path.classList.add('draw-path');path.style.animationDelay=`${i*120}ms`;});
+    });
     const cross=node(svg,'line',{x1:0,x2:0,y1:top,y2:height-bottom,stroke:'#d1e7dd','stroke-width':1,'stroke-dasharray':'4 4',visibility:'hidden'});
     const hit=node(svg,'rect',{x:left,y:top,width:width-left-right,height:height-top-bottom,fill:'transparent',tabindex:0,'aria-label':'Move pointer or use arrow keys to inspect dates'});
     const tip=tooltipId?$(tooltipId):null;
@@ -124,10 +147,13 @@
     chart(use,'forward-chart',null,true);
     $('forward-chart').setAttribute('aria-label',reconstructed.length?'Retrospective 2026 backtest path from January':'Recorded daily model from first public snapshot');
   }
-  ['lump','sip','trend','stock','holdings'].forEach(id=>$(id).addEventListener('input',renderBacktest));
+  ['lump','sip','trend','stock','holdings'].forEach(id=>{
+    $(id).addEventListener('input',renderBacktest);
+    $(id).addEventListener('change',()=>{revealedCharts.delete('growth-chart');renderBacktest();});
+  });
   ['model-trend','model-stock','model-holdings'].forEach(id=>$(id).addEventListener('input',renderBasket));
-  document.querySelectorAll('[data-period]').forEach(button=>button.addEventListener('click',()=>{activePeriod=button.dataset.period;document.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b===button));renderBacktest();}));
-  ['start-month','end-month'].forEach(id=>$(id).addEventListener('input',()=>{activePeriod='custom';document.querySelectorAll('[data-period]').forEach(b=>b.classList.remove('active'));renderBacktest();}));
+  document.querySelectorAll('[data-period]').forEach(button=>button.addEventListener('click',()=>{activePeriod=button.dataset.period;revealedCharts.delete('growth-chart');document.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b===button));renderBacktest();}));
+  ['start-month','end-month'].forEach(id=>$(id).addEventListener('input',()=>{activePeriod='custom';revealedCharts.delete('growth-chart');document.querySelectorAll('[data-period]').forEach(b=>b.classList.remove('active'));renderBacktest();}));
   async function staticJson(name) {
     const upstream=`https://raw.githubusercontent.com/Juiceyyyy/AlphEdge/main/state/${name}`;
     try {const response=await fetch(upstream,{cache:'no-store'});if(response.ok)return await response.json();}

@@ -33,5 +33,6 @@ h2,h3,h4,p{margin-top:0}h2{font:800 clamp(28px,3vw,40px)/1.2 Manrope,sans-serif;
 @media(max-width:960px){.holdings-layout{grid-template-columns:1fr}}
 
 @keyframes line-reveal{from{stroke-dasharray:1;stroke-dashoffset:1;opacity:.55}to{stroke-dasharray:1;stroke-dashoffset:0;opacity:1}}
-.draw-path{animation:line-reveal .85s cubic-bezier(.2,.75,.2,1) both}
-@media(prefers-reduced-motion:reduce){.draw-path{animation:none}}
+.path-pending{stroke-dasharray:1;stroke-dashoffset:1;opacity:.55}
+.draw-path{animation:line-reveal 1.4s cubic-bezier(.2,.75,.2,1) both}
+@media(prefers-reduced-motion:reduce){.draw-path{animation:none}.path-pending{stroke-dasharray:none;stroke-dashoffset:0;opacity:1}}
