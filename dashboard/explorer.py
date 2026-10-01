@@ -1,44 +1,24 @@
-"""Interactive research page for AlphEdge.
-
-The saved annual results power the fast initial view. Strategy changes run the
-actual backtest on demand; they never masquerade as precomputed results.
-"""
+"""Static, cached research assets for the AlphEdge public page."""
 from __future__ import annotations
 
-import asyncio
-import os
-from datetime import datetime, timezone
-from functools import lru_cache
 from pathlib import Path
-import time
+from datetime import datetime, timezone
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
-from starlette.concurrency import run_in_threadpool
 
-from alpha_strategy.backtest_momentum import MomentumConfig, run_momentum_backtest
 from alpha_strategy.config import StrategyConfig
 from alpha_strategy.data import download_history
 from alpha_strategy.momentum import benchmark_in_uptrend, rank_universe
 from alpha_strategy.universe import get_constituent_universe, rank_by_adtv, to_yahoo_symbol
 
 from .app_data import read_json
-from .store import read_snapshot, read_remote_json
+from .store import read_snapshot
 
 ROOT = Path(__file__).resolve().parent.parent
 ASSETS = Path(__file__).resolve().parent
 router = APIRouter()
-_calculation_lock = asyncio.Lock()
-
-
-class Scenario(BaseModel):
-    trend_filter: bool = True
-    stock_filter: bool = True
-    n_hold: int = Field(default=10, ge=5, le=15)
-
-
 @router.get("/explore", include_in_schema=False)
 def page():
     return FileResponse(ASSETS / "explorer.html", media_type="text/html")
@@ -61,87 +41,33 @@ def logo():
 
 @router.get("/api/explore")
 def overview():
-    winner = read_json(ROOT / "state/winner_max_sharpe.json", {})
-    wf = read_json(ROOT / "state/walk_forward.json", {})
-    snapshot = read_snapshot()
-    scenario_url = os.getenv("RESEARCH_SCENARIOS_URL")
-    scenarios = (read_remote_json(scenario_url) if scenario_url else None) or read_json(
-        ROOT / "state/scenarios.json", {})
+    """Small manifest; large scenario data loads separately and cannot block this view."""
     return {
-        "snapshot": snapshot,
-        "backtest": {"kpis": winner.get("kpis", {}), "yearly": winner.get("yearly", [])},
-        "windows": wf.get("windows_3y", []),
-        "rolling_windows": wf.get("rolling_3y_step_6m", []),
-        "scenarios": scenarios,
-        "method": "Saved selected historical backtests. Rolling windows are not independent out-of-sample trials.",
+        "snapshot": read_json(ROOT / "state/current_snapshot.json", None) or read_snapshot(),
+        "backtest": read_json(ROOT / "state/winner_max_sharpe.json", {}),
+        "windows": read_json(ROOT / "state/walk_forward.json", {}).get("windows_3y", []),
+        "rolling_windows": read_json(ROOT / "state/walk_forward.json", {}).get("rolling_3y_step_6m", []),
+        "research": read_json(ROOT / "state/research_cache.json", {}),
+        "holdings": read_json(ROOT / "state/holdings_cache.json", {}),
     }
 
 
-def _run_scenario(trend_filter: bool, stock_filter: bool, n_hold: int):
+@router.get("/api/explore/scenarios")
+def scenarios():
+    path = ROOT / "state/scenarios.json"
+    if not path.is_file():
+        return {"variants": {}}
+    return FileResponse(path, media_type="application/json", headers={"Cache-Control": "public, max-age=300"})
+
+
+def _current_candidates(trend_filter: bool, stock_filter: bool, n_hold: int, prepared=None, universe=None):
     cfg = StrategyConfig.from_yaml(ROOT / "config.yaml")
-    # Keep historical engine capital comparable to the saved 1M backtest.
-    # The visitor's deposit is replayed afterward from percentage returns.
-    cfg.starting_capital = 1_000_000
-    mc = MomentumConfig(
-        rebalance_freq="M", n_hold=n_hold, lookback_short=cfg.lookback_short,
-        lookback_long=cfg.lookback_long, momentum_skip=cfg.momentum_skip,
-        weight_short=cfg.weight_short, weight_long=cfg.weight_long,
-        weighting=cfg.weighting, vol_window=cfg.vol_window,
-        require_above_ma=stock_filter, long_ma_window=cfg.long_ma_window,
-        use_trend_filter=trend_filter, trend_filter_window=cfg.trend_filter_window,
-        min_momentum=cfg.min_momentum, target_total_exposure=cfg.target_total_exposure,
-    )
-    result = run_momentum_backtest(cfg, years=15, top_n=cfg.top_n_by_adtv,
-                                   mc=mc, verbose=False)
-    raw_equity = result.equity_curve.dropna()
-    latest_price_date = raw_equity.index.max()
-    equity = raw_equity.resample("ME").last().dropna()
-    if len(equity) < 12:
-        raise ValueError("Insufficient historical data for this scenario")
-    benchmark = result.benchmark_curve
-    benchmark = benchmark.reindex(equity.index, method="ffill") if benchmark is not None else None
-    months = []
-    for i, (dt, value) in enumerate(equity.items()):
-        months.append({
-            "date": min(dt, latest_price_date).strftime("%Y-%m-%d"),
-            "strategy_return": 0 if i == 0 else float(value / equity.iloc[i-1] - 1),
-            "benchmark_return": (0 if i == 0 or benchmark is None or
-                pd.isna(benchmark.iloc[i]) or pd.isna(benchmark.iloc[i-1]) or
-                benchmark.iloc[i-1] == 0 else
-                float(benchmark.iloc[i] / benchmark.iloc[i-1] - 1)),
-        })
-    return {"kpis": result.kpis(), "months": months,
-            "computed_at": datetime.now(timezone.utc).isoformat(),
-            "data_through": latest_price_date.strftime("%Y-%m-%d"),
-            "method": "Recomputed from historical prices; monthly return replay for investment illustration."}
-
-
-@lru_cache(maxsize=24)
-def _cached_scenario(trend_filter: bool, stock_filter: bool, n_hold: int, cache_day: int):
-    return _run_scenario(trend_filter, stock_filter, n_hold)
-
-
-@router.post("/api/explore/scenario")
-async def scenario(request: Scenario):
-    if _calculation_lock.locked():
-        raise HTTPException(status_code=429, detail="A calculation is already running; try again shortly.")
-    try:
-        async with _calculation_lock:
-            return await run_in_threadpool(_cached_scenario, request.trend_filter,
-                                           request.stock_filter, request.n_hold,
-                                           int(time.time() // 86400))
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Backtest unavailable: {type(exc).__name__}") from exc
-
-
-def _current_candidates(trend_filter: bool, stock_filter: bool, n_hold: int):
-    cfg = StrategyConfig.from_yaml(ROOT / "config.yaml")
-    universe = get_constituent_universe(cfg.index_universe,
+    universe = universe if universe is not None else get_constituent_universe(cfg.index_universe,
                                         cache_dir=ROOT / "cache",
                                         max_age_days=cfg.universe_refresh_days)
     symbols = [to_yahoo_symbol(s) for s in universe]
-    raw = download_history(symbols + [cfg.benchmark_ticker],
-                           years=2, cache_dir=ROOT / cfg.data_cache_dir)
+    raw = dict(prepared) if prepared is not None else download_history(
+        symbols + [cfg.benchmark_ticker], years=2, cache_dir=ROOT / cfg.data_cache_dir)
     bench = raw.pop(cfg.benchmark_ticker, None)
     if bench is None or bench.empty:
         raise ValueError("Benchmark prices unavailable")
@@ -174,19 +100,3 @@ def _current_candidates(trend_filter: bool, stock_filter: bool, n_hold: int):
             ], "method": "Research model target weights using the latest available close. This is not an actual portfolio or investment recommendation."}
 
 
-@lru_cache(maxsize=48)
-def _cached_candidates(trend_filter: bool, stock_filter: bool, n_hold: int, quarter_hour: int):
-    return _current_candidates(trend_filter, stock_filter, n_hold)
-
-
-@router.post("/api/explore/candidates")
-async def candidates(request: Scenario):
-    if _calculation_lock.locked():
-        raise HTTPException(status_code=429, detail="A calculation is already running; try again shortly.")
-    try:
-        async with _calculation_lock:
-            return await run_in_threadpool(_cached_candidates, request.trend_filter,
-                                           request.stock_filter, request.n_hold,
-                                           int(time.time() // 900))
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Current candidates unavailable: {type(exc).__name__}") from exc

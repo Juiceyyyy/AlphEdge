@@ -1,7 +1,7 @@
 name: Build scenario cache
 on:
   schedule:
-    - cron: '23 13 * * 6' # Weekly Saturday, after the trading week.
+    - cron: '33 13 * * 1-5' # Daily after India market close; schedule may be delayed.
   workflow_dispatch:
   push:
     branches: [main]
@@ -26,12 +26,16 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Build historical scenarios
         run: python -m jobs.build_scenarios
+      - name: Build annual and window cache
+        run: python -m jobs.build_research_cache
+      - name: Build daily target baskets
+        run: python -m jobs.build_holdings
       - name: Commit public scenarios
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add state/scenarios.json
+          git add state/scenarios.json state/research_cache.json state/holdings_cache.json
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Refresh historical scenario cache"
+          git commit -m "Refresh daily research cache"
           git pull --rebase origin main
           git push origin HEAD:main

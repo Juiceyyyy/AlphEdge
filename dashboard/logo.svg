@@ -1,7 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
-  <title id="title">AlphEdge</title>
-  <rect width="64" height="64" rx="16" fill="#102321"/>
-  <path d="M11 45 28 16l8 14 5-8 12 0" fill="none" stroke="#80e4b6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M14 45h40" fill="none" stroke="#547d76" stroke-width="3" stroke-linecap="round"/>
-  <circle cx="53" cy="22" r="3.5" fill="#d7fce7"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title"><title id="title">AlphEdge</title><defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#37a982"/><stop offset="1" stop-color="#a7f4c9"/></linearGradient></defs><rect x="1" y="1" width="62" height="62" rx="15" fill="#102321" stroke="#315e4d" stroke-width="2"/><path d="M11 44 29 17l9 18 8-11h8" fill="none" stroke="url(#g)" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/><path d="M12 50h40" stroke="#527768" stroke-width="2" stroke-linecap="round"/><circle cx="54" cy="24" r="3" fill="#b8f9d5"/></svg>

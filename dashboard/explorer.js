@@ -1,284 +1,126 @@
 (() => {
   "use strict";
   const $ = id => document.getElementById(id);
-  const money = n => new Intl.NumberFormat("en-IN", {
-    style:"currency", currency:"INR", maximumFractionDigits:0
-  }).format(Number(n) || 0);
-  const pct = n => (Number(n) || 0).toFixed(2) + "%";
-  let overview, datesInitialized = false;
-
-  const settings = () => ({
-    trend_filter: $("trend").checked,
-    stock_filter: $("stock").checked,
-    n_hold: Number($("holdings").value)
-  });
-  const settingsKey = s => [Number(s.trend_filter), Number(s.stock_filter), s.n_hold].join("/");
-  const amount = id => {
-    const value=Number($(id+"-input").value);
-    return Number.isFinite(value) ? Math.min(Math.max(0,value),1e10) : 0;
-  };
-  const message = (text, error=false) => {
-    $("scenario-message").textContent = text;
-    $("scenario-message").classList.toggle("error", error);
-  };
-  const setText = (id, value) => { $(id).textContent = value; };
-
-  function baselineMonths() {
-    // The stored backtest only has annual checkpoints. Monthly interpolation is
-    // deliberately labelled as an illustration, never as the actual price path.
-    const rows = overview.backtest.yearly.filter(x => x.year > 2011 && x.year < 2026);
-    return rows.flatMap(row => {
-      const r = Math.max(-.9999, Number(row.return_pct)/100);
-      const b = Math.max(-.9999, Number(row.bench_return_pct)/100);
-      const monthly = Math.pow(1+r, 1/12)-1;
-      const benchmark = Math.pow(1+b, 1/12)-1;
-      return Array.from({length:12}, (_, i) => ({
-        date: `${row.year}-${String(i+1).padStart(2,"0")}-28`,
-        strategy_return:monthly, benchmark_return:benchmark
-      }));
-    });
+  const money = n => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(Number(n)||0);
+  const pct = n => `${Number(n||0).toFixed(2)}%`;
+  const set = (id,value) => { $(id).textContent=value; };
+  const key = (a,b,c) => `${Number(a)}/${Number(b)}/${Number(c)}`;
+  const chartKey = () => key($('trend').checked,$('stock').checked,$('holdings').value);
+  const basketKey = () => key($('model-trend').checked,$('model-stock').checked,$('model-holdings').value);
+  let manifest=null, scenarios=null, activePeriod='120';
+  const svgNS='http://www.w3.org/2000/svg';
+  const node=(parent,tag,attrs,label)=>{const el=document.createElementNS(svgNS,tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));if(label!==undefined)el.textContent=label;parent.append(el);return el;};
+  function inform(message,error=false){set('scenario-message',message);$('scenario-message').classList.toggle('error',error);}
+  function table(target,rows){target.replaceChildren();rows.forEach(cells=>{const tr=document.createElement('tr');cells.forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});target.append(tr);});}
+  function tables(){
+    const research=manifest?.research?.variants?.[chartKey()];
+    const yearly=research?.annual || manifest?.backtest?.yearly || [];
+    table($('annual-results'),yearly.map(x=>[`${x.year}${x.active?' · YTD':''}`,pct(x.return_pct),pct(x.bench_return_pct)]));
+    const windows=research?.windows || manifest?.windows || [];
+    const active=research?.active_window;
+    const rolling=research ? [...windows, ...(active?[active]:[])] : manifest?.rolling_windows || [];
+    const format=x=>[x.label || `${x.start} – ${x.end}`,pct(x.cagr_pct),pct(x.bench_cagr_pct),pct(x.max_dd_pct)];
+    table($('window-results'),windows.filter((_,i)=>i%3===0).map(format));
+    table($('rolling-results'),rolling.map(format));
+    set('walkforward-summary',`${windows.length} completed calendar windows${active ? ` · active trailing window through ${active.end}`:''} · historically selected model`);
+    if(!yearly.length)table($('annual-results'),[['Data loading','—','—']]);
   }
-
-  function replay(months) {
-    const first = $("start-month").value, last = $("end-month").value;
-    const chosen = months.filter(m => m.date.slice(0,7) >= first && m.date.slice(0,7) <= last);
-    if (!chosen.length) {
-      ["strategy-total","benchmark-total","contributed-total","chart-period"].forEach(id=>setText(id,"—"));
-      $("growth-chart").replaceChildren();
-      message("Select a period within the saved historical data, with From before Through.", true);
-      return;
+  function renderBasket(){
+    if(!manifest)return;
+    set('model-holdings-value',`${$('model-holdings').value} stocks`);
+    const cached=manifest.holdings?.baskets?.[basketKey()];
+    const basket=cached || (basketKey()==='1/1/10'?manifest.snapshot?.basket:null);
+    const list=$('candidate-positions');list.replaceChildren();
+    if(!basket){set('candidate-status','Saved model basket is awaiting the next daily refresh.');return;}
+    set('candidate-status',`Prices through ${basket.date} · ${basket.risk_on?'Invested model':'Cash allocation'} · saved daily`);
+    if(!basket.positions.length){const div=document.createElement('div');div.className='empty-state';div.textContent=basket.risk_on?'No eligible names on this price date.':'Nifty trend filter indicates 100% cash.';list.append(div);return;}
+    basket.positions.forEach(p=>{const row=document.createElement('div');row.className='position';const info=document.createElement('div');const name=document.createElement('strong');name.textContent=p.ticker.replace('.NS','');const note=document.createElement('small');note.textContent='Target allocation';info.append(name,note);const weight=document.createElement('span');weight.className='weight';weight.textContent=`${(p.weight*100).toFixed(1)}%`;row.append(info,weight);list.append(row);});
+  }
+  function periodRows(months){
+    if(activePeriod==='custom')return months.filter(m=>m.date.slice(0,7)>=$('start-month').value && m.date.slice(0,7)<=$('end-month').value);
+    return activePeriod==='all'?months:months.slice(-Number(activePeriod));
+  }
+  function chart(rows,element,tooltipId,forward=false){
+    const svg=$(element);svg.replaceChildren();if(!rows.length)return;
+    const width=760,height=forward?200:300,left=72,right=18,top=20,bottom=35;
+    const fields=forward?['model_index','benchmark_index']:['strategy','benchmark'];
+    const values=rows.flatMap(r=>fields.map(k=>r[k]));
+    const low=forward?Math.min(...values)*.98:0,high=Math.max(1,...values)*1.07;
+    const x=i=>left+(width-left-right)*i/Math.max(1,rows.length-1);
+    const y=v=>height-bottom-(v-low)/(high-low||1)*(height-top-bottom);
+    for(let i=0;i<=4;i++){
+      const value=low+(high-low)*i/4,yy=y(value);
+      node(svg,'line',{x1:left,x2:width-right,y1:yy,y2:yy,stroke:'#2d4445','stroke-width':1});
+      const label=forward?value.toFixed(0):value>=1e7?`₹${(value/1e7).toFixed(1)}Cr`:value>=1e5?`₹${(value/1e5).toFixed(1)}L`:`₹${(value/1e3).toFixed(0)}k`;
+      node(svg,'text',{x:3,y:yy+4,fill:'#a2b6b2','font-size':11},label);
     }
-    let strategy = amount("lump");
-    let benchmark = strategy;
-    let contributed = strategy;
-    const sip = amount("sip");
-    const points = [{date:chosen[0]?.date || "", strategy, benchmark}];
-    chosen.forEach((m, i) => {
-      strategy = (strategy + sip) * (1 + Number(m.strategy_return || 0));
-      benchmark = (benchmark + sip) * (1 + Number(m.benchmark_return || 0));
-      contributed += sip;
-      if (i % 3 === 2 || i === chosen.length - 1)
-        points.push({date:m.date, strategy, benchmark});
-    });
-    setText("strategy-total", money(strategy));
-    setText("benchmark-total", money(benchmark));
-    setText("contributed-total", money(contributed));
-    setText("chart-period", chosen.length ?
-      `${chosen[0].date.slice(0,7)} — ${chosen.at(-1).date.slice(0,7)}` : "—");
-    draw(points);
-  }
-
-  function draw(points) {
-    const svg = $("growth-chart");
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
-    if (!points.length) return;
-    const NS = "http://www.w3.org/2000/svg", width = 760, height = 300;
-    const left = 66, right = 16, top = 16, bottom = 34;
-    const max = Math.max(1, ...points.map(p => Math.max(p.strategy,p.benchmark))) * 1.08;
-    const x = i => left + (width-left-right)*i/Math.max(points.length-1,1);
-    const y = v => height-bottom - Math.max(0,v)/max*(height-top-bottom);
-    function node(tag, attrs, content) {
-      const e = document.createElementNS(NS,tag);
-      for (const [k,v] of Object.entries(attrs)) e.setAttribute(k,String(v));
-      if (content !== undefined) e.textContent = content;
-      svg.appendChild(e); return e;
+    node(svg,'text',{x:left,y:height-6,fill:'#a2b6b2','font-size':11},rows[0].date.slice(0,7));
+    node(svg,'text',{x:width-right,y:height-6,fill:'#a2b6b2','font-size':11,'text-anchor':'end'},rows.at(-1).date.slice(0,7));
+    fields.slice().reverse().forEach((field,i)=>node(svg,'path',{d:rows.map((r,j)=>`${j?'L':'M'}${x(j).toFixed(1)},${y(r[field]).toFixed(1)}`).join(' '),fill:'none',stroke:i?'#67d7ad':'#82979b','stroke-width':i?3:2,'stroke-linecap':'round','stroke-linejoin':'round'}));
+    const cross=node(svg,'line',{x1:0,x2:0,y1:top,y2:height-bottom,stroke:'#d1e7dd','stroke-width':1,'stroke-dasharray':'4 4',visibility:'hidden'});
+    const hit=node(svg,'rect',{x:left,y:top,width:width-left-right,height:height-top-bottom,fill:'transparent',tabindex:0,'aria-label':'Move pointer or use arrow keys to inspect dates'});
+    const tip=tooltipId?$(tooltipId):null;
+    function inspect(i){i=Math.max(0,Math.min(rows.length-1,i));const p=rows[i];cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.setAttribute('visibility','visible');
+      if(tip){const a=p[fields[0]],b=p[fields[1]],base=rows[0];const ar=base[fields[0]]?((a/base[fields[0]]-1)*100):0,br=base[fields[1]]?((b/base[fields[1]]-1)*100):0;tip.hidden=false;tip.textContent=`${p.date}  ·  Strategy ${money(a)} (${ar>=0?'+':''}${pct(ar)})  ·  Nifty ${money(b)} (${br>=0?'+':''}${pct(br)})`;tip.style.left=`${Math.max(8,Math.min(75,100*x(i)/width-15))}%`;}
     }
-    for (let i=0;i<=4;i++) {
-      const val = max*i/4, yy = y(val);
-      node("line",{x1:left,x2:width-right,y1:yy,y2:yy,stroke:"#263638","stroke-width":1});
-      node("text",{x:3,y:yy+4,fill:"#8ba5a3","font-size":11},val>=10000000 ?
-        "₹"+(val/10000000).toFixed(1)+"Cr" : val>=100000 ?
-        "₹"+(val/100000).toFixed(1)+"L" : "₹"+Math.round(val/1000)+"k");
-    }
-    const first = points[0].date, last = points.at(-1).date;
-    node("text",{x:left,y:height-7,fill:"#8ba5a3","font-size":11},first.slice(0,7));
-    node("text",{x:width-right,y:height-7,fill:"#8ba5a3","font-size":11,"text-anchor":"end"},last.slice(0,7));
-    for (const [key,color] of [["benchmark","#789095"],["strategy","#67d7ad"]]) {
-      const d = points.map((p,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`).join(" ");
-      node("path",{d,fill:"none",stroke:color,"stroke-width":key==="strategy"?3:2,
-                   "stroke-linecap":"round","stroke-linejoin":"round"});
-    }
-    svg.setAttribute("aria-label",
-      `Investment illustration from ${first.slice(0,7)} to ${last.slice(0,7)}. Strategy ${money(points.at(-1).strategy)}; Nifty ${money(points.at(-1).benchmark)}.`);
+    hit.addEventListener('pointermove',e=>{const rect=svg.getBoundingClientRect();const local=(e.clientX-rect.left)/rect.width*width;inspect(Math.round((local-left)/(width-left-right)*(rows.length-1)));});
+    hit.addEventListener('pointerleave',()=>{cross.setAttribute('visibility','hidden');if(tip)tip.hidden=true;});
+    let focusIndex=rows.length-1;hit.addEventListener('focus',()=>inspect(focusIndex));hit.addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();inspect(focusIndex+=e.key==='ArrowRight'?1:-1);focusIndex=Math.max(0,Math.min(rows.length-1,focusIndex));}});
+    svg.setAttribute('aria-label',`Strategy and Nifty from ${rows[0].date} through ${rows.at(-1).date}`);
   }
-
-  function updateIllustration() {
-    setText("lump-value",money(amount("lump")));
-    setText("sip-value",money(amount("sip")));
-    setText("holdings-value",$("holdings").value+" stocks");
-    if (!overview) return;
-    const key = settingsKey(settings());
-    const variant = overview.scenarios?.variants?.[key];
-    if (!datesInitialized) {
-      const source = variant?.months?.length ? variant.months : baselineMonths();
-      if (source.length) {
-        const last = source.at(-1).date.slice(0,7);
-        const first = source[0].date.slice(0,7);
-        const [year, month] = last.split("-");
-        $("start-month").min = first; $("end-month").min = first;
-        $("start-month").max = last; $("end-month").max = last;
-        $("start-month").value = `${Math.max(Number(year)-10,Number(first.slice(0,4)))}-${month}`;
-        $("end-month").value = last;
-        datesInitialized = true;
-      }
-    }
-    if (variant?.months?.length) {
-      const k=variant.kpis;
-      setText("kpi-cagr",pct(k.cagr_pct));setText("kpi-drawdown",pct(k.max_drawdown_pct));
-      setText("kpi-sharpe",Number(k.sharpe||0).toFixed(2));
-      setText("kpi-benchmark",pct(k.benchmark_cagr_pct));
-      setText("kpi-source",`Saved ${$("holdings").value}-stock scenario · ${k.start}–${k.end}`);
-      setText("chart-mode", "Saved scenario · " + key.replaceAll("/", " · "));
-      setText("chart-detail", `Monthly backtest checkpoints · generated ${overview.scenarios.computed_at.slice(0,10)}`);
-      replay(variant.months);
-      message(`Showing the saved ${$("holdings").value}-stock historical run. Rules and investment inputs update the chart instantly. Historical CAGR ${pct(variant.kpis.cagr_pct)}; maximum drawdown ${pct(variant.kpis.max_drawdown_pct)}.`);
-    } else if (key === "1/1/10") {
-      const k=overview.backtest.kpis;
-      setText("kpi-cagr",pct(k.cagr_pct));setText("kpi-drawdown",pct(k.max_drawdown_pct));
-      setText("kpi-sharpe",Number(k.sharpe||0).toFixed(2));
-      setText("kpi-benchmark",pct(k.benchmark_cagr_pct));
-      setText("kpi-source",`Saved baseline · ${k.start || "2011"}–${k.end || "2026"}`);
-      setText("chart-mode", "Saved annual baseline");
-      setText("chart-detail", "Illustrative monthly values from annual results");
-      replay(baselineMonths());
-      message("The monthly scenario cache is pending. This default chart spreads annual returns evenly over each year; it is an illustration.");
-    } else {
-      setText("chart-mode", "Scenario cache pending");
-      message("This historical scenario is not available yet. The weekly cache build is pending; return to the default filters and 10 stocks for the saved baseline.", true);
-      $("growth-chart").replaceChildren();
-      ["strategy-total","benchmark-total","contributed-total","chart-period"].forEach(id=>setText(id,"—"));
-    }
+  function renderBacktest(){
+    set('lump-value',money($('lump').value));set('sip-value',money($('sip').value));set('holdings-value',`${$('holdings').value} stocks`);
+    if(!manifest)return;
+    const variant=scenarios?.variants?.[chartKey()];
+    if(!variant){set('chart-mode','Loading cached history');inform('Loading the saved research paths…');return;}
+    const k=variant.kpis;
+    set('kpi-cagr',pct(k.cagr_pct));set('kpi-drawdown',pct(k.max_drawdown_pct));set('kpi-sharpe',Number(k.sharpe||0).toFixed(2));set('kpi-benchmark',pct(k.benchmark_cagr_pct));
+    set('kpi-source',`Saved ${$('holdings').value}-stock backtest · ${k.start}–${k.end}`);
+    set('chart-mode',`Saved path · ${$('holdings').value} holdings`);
+    set('chart-detail',`Monthly checkpoints · through ${scenarios.data_through}`);
+    const months=periodRows(variant.months);
+    if(!months.length){$('growth-chart').replaceChildren();inform('Select a valid range inside the saved period.',true);return;}
+    let a=Number($('lump').value),b=a,paid=a;const sip=Number($('sip').value);
+    // Month-end checkpoints represent each period's actual saved return; the
+    // deposit is applied before each corresponding month's return.
+    const points=[{date:months[0].date,strategy:a,benchmark:b}];
+    months.forEach(m=>{a=(a+sip)*(1+m.strategy_return);b=(b+sip)*(1+m.benchmark_return);paid+=sip;points.push({date:m.date,strategy:a,benchmark:b});});
+    set('strategy-total',money(a));set('benchmark-total',money(b));set('contributed-total',money(paid));
+    set('chart-period',`${months[0].date.slice(0,7)} — ${months.at(-1).date.slice(0,7)}`);
+    chart(points,'growth-chart','growth-tooltip');
+    inform(`Saved ${$('holdings').value}-stock path through ${scenarios.data_through}. Investment values are illustrative.`);
+    tables();
   }
-
-  function setPending() {
-    if(settingsKey(settings()) !== "1/1/10")
-      setText("candidate-status","Showing the daily baseline basket. Select Refresh holdings to calculate the chosen rules.");
-    else if(overview?.snapshot)
-      setText("candidate-status",`Daily baseline · prices through ${overview.snapshot.price_date}`);
+  function forward(){
+    if(!manifest)return;
+    const recorded=manifest.snapshot?.forward||[];
+    const history=scenarios?.variants?.['1/1/10']?.months?.filter(m=>m.date.slice(0,4)==='2026')||[];
+    let a=100,b=100;
+    const reconstructed=history.map(m=>{a*=1+m.strategy_return;b*=1+m.benchmark_return;return{date:m.date,model_index:a,benchmark_index:b};});
+    // Never splice distinct retrospectively calculated and daily observed series.
+    const use=reconstructed.length?reconstructed:recorded;
+    set('forward-model',use.length?use.at(-1).model_index.toFixed(2):'—');set('forward-nifty',use.length?use.at(-1).benchmark_index.toFixed(2):'—');
+    set('forward-period',use.length?`${use[0].date} — ${use.at(-1).date}`:'Awaiting saved path');
+    chart(use,'forward-chart',null,true);
+    $('forward-chart').setAttribute('aria-label',reconstructed.length?'Retrospective 2026 backtest path from January':'Recorded daily model from first public snapshot');
   }
-
-  function renderForward(rows) {
-    const svg=$("forward-chart");svg.replaceChildren();
-    setText("forward-period",rows.length ? `${rows[0].date} — ${rows.at(-1).date}` : "Awaiting first refresh");
-    setText("forward-model",rows.length ? rows.at(-1).model_index.toFixed(2) : "—");
-    setText("forward-nifty",rows.length ? rows.at(-1).benchmark_index.toFixed(2) : "—");
-    if(!rows.length) return;
-    const NS="http://www.w3.org/2000/svg", width=760, height=200;
-    const values=rows.flatMap(r=>[r.model_index,r.benchmark_index]);
-    const min=Math.min(...values)*.98, max=Math.max(...values)*1.02;
-    const x=i=>36+(width-52)*i/Math.max(rows.length-1,1);
-    const y=value=>height-22-(value-min)/(max-min||1)*(height-42);
-    for(const [key,color] of [["benchmark_index","#789095"],["model_index","#67d7ad"]]) {
-      const path=document.createElementNS(NS,"path");
-      path.setAttribute("d",rows.map((r,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(r[key]).toFixed(1)}`).join(" "));
-      path.setAttribute("fill","none");path.setAttribute("stroke",color);
-      path.setAttribute("stroke-width",key==="model_index"?3:2);
-      path.setAttribute("stroke-linecap","round");svg.appendChild(path);
-    }
-    svg.setAttribute("aria-label",`Forward research model index ${rows.at(-1).model_index.toFixed(2)} and Nifty index ${rows.at(-1).benchmark_index.toFixed(2)} through ${rows.at(-1).date}. Both began at 100 on ${rows[0].date}.`);
+  ['lump','sip','trend','stock','holdings'].forEach(id=>$(id).addEventListener('input',renderBacktest));
+  ['model-trend','model-stock','model-holdings'].forEach(id=>$(id).addEventListener('input',renderBasket));
+  document.querySelectorAll('[data-period]').forEach(button=>button.addEventListener('click',()=>{activePeriod=button.dataset.period;document.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b===button));renderBacktest();}));
+  ['start-month','end-month'].forEach(id=>$(id).addEventListener('input',()=>{activePeriod='custom';document.querySelectorAll('[data-period]').forEach(b=>b.classList.remove('active'));renderBacktest();}));
+  async function load(){
+    try{
+      const [overview,paths]=await Promise.all([fetch('/api/explore',{cache:'no-store'}),fetch('/api/explore/scenarios')]);
+      if(!overview.ok||!paths.ok)throw Error('Saved data could not be fetched');
+      manifest=await overview.json();scenarios=await paths.json();
+      if(!scenarios?.variants?.['1/1/10'])throw Error('The historical cache is temporarily unavailable');
+      const months=scenarios.variants['1/1/10'].months;
+      $('start-month').min=months[0].date.slice(0,7);$('start-month').max=months.at(-1).date.slice(0,7);
+      $('end-month').min=months[0].date.slice(0,7);$('end-month').max=months.at(-1).date.slice(0,7);
+      if(!$('start-month').value)$('start-month').value=months[0].date.slice(0,7);
+      if(!$('end-month').value)$('end-month').value=months.at(-1).date.slice(0,7);
+      renderBacktest();renderBasket();forward();
+    }catch(e){inform(`Saved research could not load: ${e.message}. Please reload the page.`,true);set('candidate-status','Daily basket unavailable.');}
   }
-
-  function renderResearchTables(data) {
-    const annual = $("annual-results"), windows = $("window-results"), rolling = $("rolling-results");
-    const row = (target, cells) => {
-      const tr = document.createElement("tr");
-      cells.forEach(value => { const td = document.createElement("td"); td.textContent = value; tr.append(td); });
-      target.append(tr);
-    };
-    annual.replaceChildren(); windows.replaceChildren(); rolling.replaceChildren();
-    (data.backtest.yearly || []).forEach(x => row(annual,
-      [x.year, pct(x.return_pct), pct(x.bench_return_pct)]));
-    (data.windows || []).forEach(x => row(windows,
-      [x.label || `${x.start} – ${x.end}`, pct(x.cagr_pct), pct(x.bench_cagr_pct), pct(x.max_dd_pct)]));
-    (data.rolling_windows || []).forEach(x => row(rolling,
-      [`${x.start} – ${x.end}`, pct(x.cagr_pct), pct(x.bench_cagr_pct), pct(x.max_dd_pct)]));
-    const periods = data.windows || [];
-    const beats = periods.filter(x => x.cagr_pct > x.bench_cagr_pct).length;
-    setText("walkforward-summary", `${beats} of ${periods.length} consecutive periods exceeded Nifty 50 · ${rolling.childElementCount} overlapping windows available`);
-    if (!annual.childElementCount) row(annual, ["No saved results", "—", "—"]);
-    if (!windows.childElementCount) row(windows, ["No saved windows", "—", "—", "—"]);
-    if (!rolling.childElementCount) row(rolling, ["No saved rolling windows", "—", "—", "—"]);
-  }
-
-  function position(list,ticker,weight,caption) {
-    const row=document.createElement("div");row.className="position";
-    const left=document.createElement("div");
-    const name=document.createElement("strong");name.textContent=ticker.replace(".NS","");
-    const note=document.createElement("small");note.textContent=caption;
-    left.append(name,note);
-    const right=document.createElement("span");right.className="weight";
-    right.textContent=(100*weight).toFixed(1)+"%";
-    row.append(left,right);list.append(row);
-  }
-
-  async function post(url, body) {
-    const controller = new AbortController();
-    const timer = setTimeout(()=>controller.abort(),180000);
-    try {
-      const response=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(body),signal:controller.signal});
-      const data=await response.json();
-      if(!response.ok) throw new Error(data.detail || "The calculation was unavailable.");
-      return data;
-    } finally { clearTimeout(timer); }
-  }
-
-  async function calculateCandidates() {
-    const button=$("calculate-candidates"), chosen=settings();
-    button.disabled=true; button.textContent="Calculating candidates…";
-    setText("candidate-status","Downloading latest available prices and applying the rules…");
-    try {
-      const data=await post("/api/explore/candidates",chosen);
-      const list=$("candidate-positions");list.replaceChildren();
-      setText("candidate-status",
-        `Prices through ${data.date} · ${data.risk_on?"Invested model":"Cash allocation"} · Calculated ${new Date(data.computed_at).toLocaleString("en-IN")}`);
-      if(data.positions.length) data.positions.forEach(p =>
-        position(list,p.ticker,p.weight,"Model target weight"));
-      else {
-        const div=document.createElement("div");div.className="empty-state";
-        div.textContent=data.risk_on?"No eligible candidates with current data.":"Nifty trend filter indicates a 100% cash allocation.";
-        list.append(div);
-      }
-      if(settingsKey(settings())!==settingsKey(chosen)) setPending();
-    } catch(e) {
-      setText("candidate-status",
-        `Model holdings unavailable: ${e.name==="AbortError"?"request timed out":e.message}. Try refreshing later.`);
-    } finally {button.disabled=false;button.innerHTML='Calculate current candidates <span aria-hidden="true">→</span>';}
-  }
-
-  ["lump","sip"].forEach(id=>{
-    $(id).addEventListener("input",()=>{$(id+"-input").value=$(id).value;updateIllustration();});
-    $(id+"-input").addEventListener("input",()=>{
-      $(id).value=Math.min(amount(id),Number($(id).max));updateIllustration();
-    });
-  });
-  ["start-month","end-month"].forEach(id=>$(id).addEventListener("input",updateIllustration));
-  ["trend","stock","holdings"].forEach(id=>$(id).addEventListener("input",()=>{
-    updateIllustration();setPending();
-  }));
-  $("calculate-candidates").addEventListener("click",calculateCandidates);
-  updateIllustration();
-  function loadOverview() {
-    return fetch("/api/explore").then(r=>{if(!r.ok)throw Error("Data unavailable");return r.json();})
-    .then(data=>{
-      overview=data;
-      if(data.snapshot){
-        const snap=data.snapshot;
-        renderForward(snap.forward || []);
-        const basket=snap.basket;
-        if(settingsKey(settings()) === "1/1/10") {
-          setText("candidate-status",`Prices through ${basket.date} · ${basket.risk_on?"Invested model":"Cash allocation"} · Daily refresh`);
-          const list=$("candidate-positions");list.replaceChildren();
-          if(basket.positions.length) basket.positions.forEach(p=>position(list,p.ticker,p.weight,"Model target weight"));
-          else {const div=document.createElement("div");div.className="empty-state";div.textContent=basket.risk_on?"No eligible stocks with current data.":"Nifty trend filter indicates a 100% cash allocation.";list.append(div);}
-        }
-      } else {
-        setText("candidate-status","Daily research snapshot pending. Refresh holdings to calculate on demand.");
-      }
-      renderResearchTables(data);updateIllustration();
-    })
-    .catch(e=>message("Could not load saved research data: "+e.message,true));
-  }
-  loadOverview();
-  setInterval(loadOverview, 15 * 60 * 1000);
+  load();setInterval(load,15*60*1000);
 })();

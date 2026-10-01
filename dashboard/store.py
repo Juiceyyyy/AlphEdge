@@ -45,13 +45,13 @@ def initialize():
 
 
 def read_snapshot(name="daily"):
-    remote_url = os.getenv("RESEARCH_SNAPSHOT_URL")
-    if name == "daily" and remote_url:
-        return read_remote_json(remote_url)
     snapshot_path = os.getenv("RESEARCH_SNAPSHOT_FILE")
     if name == "daily" and snapshot_path:
         snapshot_file = Path(snapshot_path)
         return json.loads(snapshot_file.read_text(encoding="utf-8")) if snapshot_file.exists() else None
+    remote_url = os.getenv("RESEARCH_SNAPSHOT_URL")
+    if name == "daily" and remote_url:
+        return read_remote_json(remote_url)
     initialize()
     with connection() as (db, marker):
         row = db.execute(f"SELECT payload FROM research_snapshots WHERE name = {marker}", (name,)).fetchone()
