@@ -14,10 +14,10 @@ def export():
     html = (ROOT / 'dashboard/explorer.html').read_text(encoding='utf-8')
     html = html.replace('/explore/logo.svg', '/logo.svg')
     html = html.replace('/explore/styles.css', '/styles.css')
-    html = html.replace('/explore/app.js?v=3', '/app.js?v=3')
+    html = html.replace('/explore/app.js?v=4', '/app.js?v=4')
     html = html.replace('href="/explore"', 'href="/"')
-    html = html.replace('<script src="/app.js?v=3" defer></script>',
-                        '<script>window.ALPHEDGE_STATIC=true</script><script src="/app.js?v=3" defer></script>')
+    html = html.replace('<script src="/app.js?v=4" defer></script>',
+                        '<script>window.ALPHEDGE_STATIC=true</script><script src="/app.js?v=4" defer></script>')
     (site / 'index.html').write_text(html, encoding='utf-8')
     for source, target in [('dashboard/explorer.js','app.js'),
                            ('dashboard/explorer.css','styles.css'),

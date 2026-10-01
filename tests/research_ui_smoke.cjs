@@ -1,15 +1,16 @@
 const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
 class Element{
- constructor(){this.children=[];this.value='';this.checked=true;this.textContent='';this.handlers={};this.classList={toggle(){},remove(){}};this.dataset={};this.style={};}
+ constructor(){this.children=[];this.value='';this.checked=true;this.textContent='';this.handlers={};this.attrs={};this.classList={toggle(){},remove(){}};this.dataset={};this.style={};}
  append(...items){this.children.push(...items);this.firstChild=this.children[0]}
  replaceChildren(){this.children=[];this.firstChild=null}
  addEventListener(type,fn){this.handlers[type]=fn}
- setAttribute(){}
+ setAttribute(name,value){this.attrs[name]=String(value)}
  get childElementCount(){return this.children.length}
 }
 const els=new Map(),get=id=>els.get(id)||(els.set(id,new Element()),els.get(id));
 Object.assign(get('lump'),{value:'100000'});Object.assign(get('sip'),{value:'10000'});
 Object.assign(get('holdings'),{value:'10'});Object.assign(get('model-holdings'),{value:'10'});
+Object.assign(get('growth-chart'),{clientWidth:320,clientHeight:220});
 const months=Array.from({length:36},(_,i)=>({date:`2023-${String(i%12+1).padStart(2,'0')}-28`,strategy_return:.01,benchmark_return:.005}));
 const scenario={kpis:{cagr_pct:22,max_drawdown_pct:-18,sharpe:1.2,benchmark_cagr_pct:8,start:'2011',end:'2026'},months};
 const basket={date:'2026-09-25',risk_on:true,positions:[{ticker:'TEST.NS',weight:.6},{ticker:'EXAMPLE.NS',weight:.4}]};
@@ -30,5 +31,6 @@ setTimeout(()=>{
  get('model-holdings').value='6';get('model-holdings').handlers.input();
  assert.equal(requests,before,'controls replay cached paths without network calls');
  assert.match(get('chart-mode').textContent,/Saved path/);
+ assert.equal(get('growth-chart').attrs.viewBox,'0 0 320 220','chart uses available phone width');
  console.log('Cached research UI interactions passed');
 },30);

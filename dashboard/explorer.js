@@ -80,7 +80,10 @@
   }
   function chart(rows,element,tooltipId,forward=false){
     const svg=$(element);svg.replaceChildren();if(!rows.length)return;
-    const width=760,height=forward?200:300,left=72,right=18,top=20,bottom=35;
+    const width=Math.max(260,Math.round(svg.clientWidth)||760);
+    const height=Math.max(170,Math.round(svg.clientHeight)||(forward?200:300));
+    const left=width<420?58:72,right=width<420?8:18,top=20,bottom=35;
+    svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
     const fields=forward?['model_index','benchmark_index']:['strategy','benchmark'];
     const values=rows.flatMap(r=>fields.map(k=>r[k]));
     const low=forward?Math.min(...values)*.98:0,high=Math.max(1,...values)*1.07;
@@ -185,6 +188,13 @@
       if(!$('end-month').value)$('end-month').value=months.at(-1).date.slice(0,7);
       renderBacktest();renderBasket();forward();
     }catch(e){inform(`Saved research could not load: ${e.message}. Please reload the page.`,true);set('candidate-status','Daily basket unavailable.');}
+  }
+  if(typeof window.addEventListener==='function'){
+    let resizeTimer;
+    window.addEventListener('resize',()=>{
+      clearTimeout(resizeTimer);
+      resizeTimer=setTimeout(()=>{if(manifest&&scenarios){renderBacktest();forward();}},120);
+    });
   }
   load();setInterval(load,15*60*1000);
 })();

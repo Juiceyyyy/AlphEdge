@@ -65,3 +65,30 @@ h2,h3,h4,p{margin-top:0}h2{font:800 clamp(28px,3vw,40px)/1.2 Manrope,sans-serif;
   .method-grid{grid-template-columns:1fr;gap:16px}.method-grid h3{margin:9px 0 5px}
   .period-pills button{min-height:40px}.chart-card,.backtest-detail,.holdings-card{padding:16px}
 }
+/* The mobile header exposes every section without a hidden horizontal menu. */
+.explorer-grid>*,.holdings-layout>*,.results,.card,.section-top>div{min-width:0}
+@media(max-width:820px){
+  .topbar nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;overflow:visible;border-top:1px solid var(--line);padding:10px 0 0}
+  .topbar nav a{justify-content:center;text-align:center;white-space:normal;line-height:1.2}
+}
+@media(max-width:650px){
+  .topbar nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 8px}
+  .topbar nav a{min-height:39px;padding:5px 7px;border-radius:7px;background:#142022;font-size:12px}
+  .topbar .nav-cta{font-size:12px}
+  .section-top{align-items:flex-start;flex-direction:column;gap:8px;margin-bottom:23px}
+  .source-label{display:block;white-space:normal;line-height:1.4}
+  .control-head{flex-wrap:wrap}.date-range{grid-template-columns:repeat(2,minmax(0,1fr))}.date-range input{min-width:0}
+  .chart-wrap svg{overflow:hidden}.chart-tooltip{max-width:calc(100% - 16px);font-size:10px}
+  .chart-footer{line-height:1.5}.table-scroll{max-width:100%}
+  .forward-section{padding-bottom:60px}.footer-inner{display:block}.footer-inner span{display:block}.footer-inner span+span{margin-top:8px}
+}
+@media(max-width:420px){
+  .hero h1{letter-spacing:-.045em}.eyebrow,.kicker{font-size:10px;letter-spacing:.1em}
+  .stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stat{min-width:0}.stat strong{font-size:clamp(19px,6vw,23px);overflow-wrap:anywhere}
+  .date-range{grid-template-columns:1fr}
+  .totals{grid-template-columns:1fr;gap:8px;margin-top:22px}
+  .totals div:last-child{grid-column:auto}.totals div{padding-top:9px}
+  .totals strong{font-size:21px}.chart-wrap{height:220px}.forward-wrap{height:185px}
+  .period-pills{gap:2px;padding:3px}.period-pills button{font-size:11px}
+}
