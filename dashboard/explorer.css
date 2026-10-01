@@ -18,11 +18,12 @@ h2,h3,h4,p{margin-top:0}h2{font:800 clamp(28px,3vw,40px)/1.2 Manrope,sans-serif;
 
 /* AlphEdge's ascending line mark is shared by the header and favicon. */
 .brand-mark{display:block;height:36px;width:36px;flex:none;border-radius:10px;background:none;color:inherit}
-.topbar nav{gap:clamp(12px,1.5vw,24px)}
-.topbar nav .nav-cta{display:inline-flex;align-items:center;justify-content:center;gap:12px;min-height:40px;padding:9px 14px;border-radius:8px;background:var(--green);color:#07150f;font-weight:800;white-space:nowrap;transition:background .2s,transform .2s}
-.topbar nav .nav-cta:hover{background:#a3ffd1;color:#07150f;transform:translateY(-1px)}
+.topbar-inner{gap:clamp(12px,2vw,24px)}
+.topbar nav{gap:clamp(12px,1.5vw,24px);margin-left:auto}
+.topbar .nav-cta{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 15px;border-radius:8px;background:var(--green);color:#07150f;font-size:12px;font-weight:800;white-space:nowrap;transition:background .2s,transform .2s}
+.topbar .nav-cta:hover{background:#a3ffd1;color:#07150f;transform:translateY(-1px)}
 @media(max-width:1100px){.brand-sub,.brand-divider{display:none}.topbar nav{gap:12px}}
-@media(max-width:780px){.topbar-inner{flex-wrap:wrap;padding:14px 0}.topbar nav{width:100%;overflow-x:auto;white-space:nowrap;padding-bottom:4px}.topbar nav .nav-cta{min-height:38px}}
+@media(max-width:820px){.topbar-inner{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:14px 0}.topbar nav{grid-column:1/-1;grid-row:2;width:100%;margin:0;overflow-x:auto;white-space:nowrap;padding:3px 0 5px;scrollbar-width:thin}.topbar nav a{flex:none}.topbar .nav-cta{grid-column:2;grid-row:1;min-height:38px}}
 .date-range{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:9px}
 .date-range .control{margin-bottom:18px}
 .date-range label{display:block;margin-bottom:8px;font-size:12px;font-weight:700}
@@ -41,3 +42,26 @@ h2,h3,h4,p{margin-top:0}h2{font:800 clamp(28px,3vw,40px)/1.2 Manrope,sans-serif;
 .path-pending{stroke-dasharray:1;stroke-dashoffset:1;opacity:.55}
 .draw-path{animation:line-reveal 1.4s cubic-bezier(.2,.75,.2,1) both}
 @media(prefers-reduced-motion:reduce){.draw-path{animation:none}.path-pending{stroke-dasharray:none;stroke-dashoffset:0;opacity:1}}
+@media(max-width:650px){
+  .topbar nav{display:flex;gap:20px;font-size:12px}
+  .topbar nav a{font-size:12px;min-height:36px;display:inline-flex;align-items:center}
+  .brand{min-width:0;font-size:15px}.brand-mark{height:32px;width:32px}
+  .hero{padding:46px 0 58px}.hero h1{font-size:clamp(34px,9vw,42px);line-height:1.13}.lead{font-size:15px;line-height:1.65}
+  .hero-actions{flex-wrap:wrap;gap:16px}.hero-actions .button{width:100%;justify-content:center}
+  .hero-note{padding-left:17px}.hero-note p{font-size:16px;margin:15px 0}
+  .section-tint,.portfolio-section{padding:54px 0}.summary{padding-bottom:54px}
+  .card-head{flex-wrap:wrap}.chart-header .mode{white-space:normal}
+  .totals{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  .totals div:last-child{grid-column:1/-1}.totals span{font-size:11px}.totals strong{font-size:clamp(17px,5vw,22px);overflow-wrap:anywhere}
+  .chart-wrap{height:230px}.forward-wrap{height:180px}
+  .backtest-detail table{min-width:520px}.table-scroll{overflow-x:auto;overscroll-behavior-inline:contain}
+  .backtest-detail .card-head{align-items:flex-start}.backtest-detail .chip{white-space:normal}
+  .controls{padding:18px}.switch-row strong{font-size:13px}.switch-row small{font-size:11px}
+}
+@media(max-width:420px){
+  .shell{width:calc(100% - 28px)}.topbar .nav-cta{padding:8px 10px;font-size:11px}
+  .brand{gap:7px;font-size:14px}.brand-mark{height:30px;width:30px}
+  .stat{min-height:118px;padding:15px}.stat strong{font-size:23px}
+  .method-grid{grid-template-columns:1fr;gap:16px}.method-grid h3{margin:9px 0 5px}
+  .period-pills button{min-height:40px}.chart-card,.backtest-detail,.holdings-card{padding:16px}
+}
