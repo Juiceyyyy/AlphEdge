@@ -61,7 +61,7 @@
     const hit=node(svg,'rect',{x:left,y:top,width:width-left-right,height:height-top-bottom,fill:'transparent',tabindex:0,'aria-label':'Move pointer or use arrow keys to inspect dates'});
     const tip=tooltipId?$(tooltipId):null;
     function inspect(i){i=Math.max(0,Math.min(rows.length-1,i));const p=rows[i];cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.setAttribute('visibility','visible');
-      if(tip){const a=p[fields[0]],b=p[fields[1]],base=rows[0];const ar=base[fields[0]]?((a/base[fields[0]]-1)*100):0,br=base[fields[1]]?((b/base[fields[1]]-1)*100):0;tip.hidden=false;tip.textContent=`${p.date}  ·  Strategy ${money(a)} (${ar>=0?'+':''}${pct(ar)})  ·  Nifty ${money(b)} (${br>=0?'+':''}${pct(br)})`;tip.style.left=`${Math.max(8,Math.min(75,100*x(i)/width-15))}%`;}
+      if(tip){const a=p[fields[0]],b=p[fields[1]],base=rows[0];const contributed=p.contributed||base[fields[0]];const ar=contributed?((a/contributed-1)*100):0,br=contributed?((b/contributed-1)*100):0;tip.hidden=false;tip.textContent=`${p.date}  ·  Strategy ${money(a)} (${ar>=0?'+':''}${pct(ar)})  ·  Nifty ${money(b)} (${br>=0?'+':''}${pct(br)})  ·  return vs contributed`;tip.style.left=`${Math.max(8,Math.min(75,100*x(i)/width-15))}%`;}
     }
     hit.addEventListener('pointermove',e=>{const rect=svg.getBoundingClientRect();const local=(e.clientX-rect.left)/rect.width*width;inspect(Math.round((local-left)/(width-left-right)*(rows.length-1)));});
     hit.addEventListener('pointerleave',()=>{cross.setAttribute('visibility','hidden');if(tip)tip.hidden=true;});
@@ -83,8 +83,8 @@
     let a=Number($('lump').value),b=a,paid=a;const sip=Number($('sip').value);
     // Month-end checkpoints represent each period's actual saved return; the
     // deposit is applied before each corresponding month's return.
-    const points=[{date:months[0].date,strategy:a,benchmark:b}];
-    months.forEach(m=>{a=(a+sip)*(1+m.strategy_return);b=(b+sip)*(1+m.benchmark_return);paid+=sip;points.push({date:m.date,strategy:a,benchmark:b});});
+    const points=[{date:`${months[0].date.slice(0,7)}-01`,strategy:a,benchmark:b,contributed:paid}];
+    months.forEach(m=>{a=(a+sip)*(1+m.strategy_return);b=(b+sip)*(1+m.benchmark_return);paid+=sip;points.push({date:m.date,strategy:a,benchmark:b,contributed:paid});});
     set('strategy-total',money(a));set('benchmark-total',money(b));set('contributed-total',money(paid));
     set('chart-period',`${months[0].date.slice(0,7)} — ${months.at(-1).date.slice(0,7)}`);
     chart(points,'growth-chart','growth-tooltip');
