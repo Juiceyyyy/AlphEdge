@@ -18,6 +18,11 @@ h2,h3,h4,p{margin-top:0}h2{font:800 clamp(28px,3vw,40px)/1.2 Manrope,sans-serif;
 
 /* AlphEdge's ascending line mark is shared by the header and favicon. */
 .brand-mark{display:block;height:36px;width:36px;flex:none;border-radius:10px;background:none;color:inherit}
+.topbar nav{gap:clamp(12px,1.5vw,24px)}
+.topbar nav .nav-cta{display:inline-flex;align-items:center;justify-content:center;gap:12px;min-height:40px;padding:9px 14px;border-radius:8px;background:var(--green);color:#07150f;font-weight:800;white-space:nowrap;transition:background .2s,transform .2s}
+.topbar nav .nav-cta:hover{background:#a3ffd1;color:#07150f;transform:translateY(-1px)}
+@media(max-width:1100px){.brand-sub,.brand-divider{display:none}.topbar nav{gap:12px}}
+@media(max-width:780px){.topbar-inner{flex-wrap:wrap;padding:14px 0}.topbar nav{width:100%;overflow-x:auto;white-space:nowrap;padding-bottom:4px}.topbar nav .nav-cta{min-height:38px}}
 .date-range{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:9px}
 .date-range .control{margin-bottom:18px}
 .date-range label{display:block;margin-bottom:8px;font-size:12px;font-weight:700}
