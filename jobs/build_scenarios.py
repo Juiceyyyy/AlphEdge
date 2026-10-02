@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """Build reusable historical scenario paths for instant client-side illustrations."""
 from __future__ import annotations
 

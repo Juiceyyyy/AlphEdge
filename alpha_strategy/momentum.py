@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """Cross-sectional momentum scoring (Jegadeesh-Titman style).
 
 For each ticker on each rebalance date:

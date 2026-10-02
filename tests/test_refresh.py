@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 import unittest
 from unittest.mock import patch
 import pandas as pd

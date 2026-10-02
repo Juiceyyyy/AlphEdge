@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """Explicit-plan CNC rebalance for an individual's locally managed Kite account.
 
 The public research server never imports or calls this module.

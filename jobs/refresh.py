@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """Refresh the public, forward-only research model after market close."""
 from __future__ import annotations
 

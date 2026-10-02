@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """Configuration loader for the momentum strategy."""
 from __future__ import annotations
 from dataclasses import dataclass, field, asdict

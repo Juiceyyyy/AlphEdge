@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """Read-only research API and landing page for AlphEdge."""
 from datetime import datetime, timezone
 

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """Monthly-rebalanced cross-sectional momentum backtest.
 
 Master calendar = benchmark trading days. On the first trading day of every

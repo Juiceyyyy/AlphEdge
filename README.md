@@ -1,5 +1,7 @@
 # AlphEdge
 
+Developed by [Joshua Menezes](https://github.com/Juiceyyyy).
+
 An Indian-equity momentum research site with a weekday forward model record and an optional **self-hosted** Zerodha Kite account runner. [Explore the live Vercel site](https://alph-edge.vercel.app/). It shows historical simulations and the stocks the model would target using the latest available close. It never connects to a visitor's brokerage account or displays real account balances. The highlighted **Connect broker** link on the site leads to the local setup instructions below; it does not connect an account in the browser.
 
 ## What you can inspect
@@ -61,4 +63,4 @@ These cover storage replacement, broker planning without orders, default disable
 
 The repository includes source, configuration templates, historical research outputs and a public model snapshot when available. It excludes `.env`, account tokens, local journals, price caches, SQLite databases, logs and private holdings. Check `git status` and run a secret scan before every public push. Keep account runners in each user's private environment; never paste broker keys into issues, screenshots or public deployment variables.
 
-MIT licensed. Educational research; no investment recommendation or guarantee of returns.
+MIT licensed. Copyright (c) 2026 Joshua Menezes and AlphEdge contributors. Retain the copyright and license notice when copying or distributing substantial portions. Educational research; no investment recommendation or guarantee of returns.

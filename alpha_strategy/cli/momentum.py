@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """CLI: run the cross-sectional momentum rotation backtest."""
 from __future__ import annotations
 import argparse

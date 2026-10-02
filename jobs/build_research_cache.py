@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """Materialize annual and three-year views from completed monthly checkpoints.
 
 Completed calendar years are immutable once archived; only the active YTD and

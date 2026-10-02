@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """Shared, side-effect-free JSON reader for the research page."""
 import json
 from pathlib import Path

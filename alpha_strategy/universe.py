@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """Dynamic NSE universe selection (Nifty 200 + Next 50 + Midcap 150) ranked by ADTV.
 
 Fetches current index constituents from NSE archives, caches CSVs locally for 30 days

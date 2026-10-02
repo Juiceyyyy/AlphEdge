@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """User-operated Kite login token exchange. Run only on a trusted machine."""
 import getpass
 import hashlib

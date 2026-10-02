@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """Small Kite Connect v3 client for a user's own local runner."""
 import os
 from pathlib import Path

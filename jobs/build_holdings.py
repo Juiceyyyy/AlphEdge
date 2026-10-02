@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """Precompute every research basket from a single completed market snapshot."""
 import json
 from datetime import datetime, timezone

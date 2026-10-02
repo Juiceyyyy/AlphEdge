@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """Export the read-only research interface for free static hosting."""
 from pathlib import Path
 from shutil import copyfile

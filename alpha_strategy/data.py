@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """yfinance OHLCV downloader with parquet cache + eviction."""
 from __future__ import annotations
 from datetime import datetime, timedelta

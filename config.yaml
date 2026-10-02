@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 # AlphEdge - historically selected momentum configuration.
 # Saved baseline simulation: CAGR 40.69% / Max DD -20.91% / Sharpe 1.93 / Calmar 1.95.
 # Rolling windows reuse this selection; they do not establish independent out-of-sample results.

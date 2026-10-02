@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
 """Static, cached research assets for the AlphEdge public page."""
 from __future__ import annotations
 
