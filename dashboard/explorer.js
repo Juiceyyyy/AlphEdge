@@ -50,16 +50,23 @@
   const node=(parent,tag,attrs,label)=>{const el=document.createElementNS(svgNS,tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));if(label!==undefined)el.textContent=label;parent.append(el);return el;};
   function inform(message,error=false){set('scenario-message',message);$('scenario-message').classList.toggle('error',error);}
   function table(target,rows){target.replaceChildren();rows.forEach(cells=>{const tr=document.createElement('tr');cells.forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});target.append(tr);});}
+  function comparisonTable(target,rows){
+    table(target,rows.map(({cells})=>cells));
+    rows.forEach(({strategy,benchmark},i)=>{
+      if(!Number.isFinite(strategy)||!Number.isFinite(benchmark)||strategy===benchmark)return;
+      target.children[i].children[strategy>benchmark?1:2].classList.add('return-winner');
+    });
+  }
   function tables(){
     const research=manifest?.research?.variants?.[chartKey()];
     const yearly=research?.annual || manifest?.backtest?.yearly || [];
-    table($('annual-results'),yearly.map(x=>[`${x.year}${x.active?' · YTD':''}`,pct(x.return_pct),pct(x.bench_return_pct)]));
+    comparisonTable($('annual-results'),yearly.map(x=>({cells:[`${x.year}${x.active?' · YTD':''}`,pct(x.return_pct),pct(x.bench_return_pct)],strategy:Number(x.return_pct),benchmark:Number(x.bench_return_pct)})));
     const windows=research?.windows || manifest?.windows || [];
     const active=research?.active_window;
     const rolling=research ? [...windows, ...(active?[active]:[])] : manifest?.rolling_windows || [];
-    const format=x=>[x.label || `${x.start} – ${x.end}`,pct(x.cagr_pct),pct(x.bench_cagr_pct),pct(x.max_dd_pct)];
-    table($('window-results'),windows.filter((_,i)=>i%3===0).map(format));
-    table($('rolling-results'),rolling.map(format));
+    const format=x=>({cells:[x.label || `${x.start} – ${x.end}`,pct(x.cagr_pct),pct(x.bench_cagr_pct),pct(x.max_dd_pct)],strategy:Number(x.cagr_pct),benchmark:Number(x.bench_cagr_pct)});
+    comparisonTable($('window-results'),windows.filter((_,i)=>i%3===0).map(format));
+    comparisonTable($('rolling-results'),rolling.map(format));
     set('walkforward-summary',`${windows.length} completed calendar windows${active ? ` · active trailing window through ${active.end}`:''} · historically selected model`);
     if(!yearly.length)table($('annual-results'),[['Data loading','—','—']]);
   }

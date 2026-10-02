@@ -1,6 +1,6 @@
 const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
 class Element{
- constructor(){this.children=[];this.value='';this.checked=true;this.textContent='';this.handlers={};this.attrs={};this.classList={toggle(){},remove(){}};this.dataset={};this.style={};}
+ constructor(){this.children=[];this.value='';this.checked=true;this.textContent='';this.handlers={};this.attrs={};this.classes=new Set();this.classList={toggle(){},remove(){},add:name=>this.classes.add(name)};this.dataset={};this.style={};}
  append(...items){this.children.push(...items);this.firstChild=this.children[0]}
  replaceChildren(){this.children=[];this.firstChild=null}
  addEventListener(type,fn){this.handlers[type]=fn}
@@ -14,7 +14,7 @@ Object.assign(get('growth-chart'),{clientWidth:320,clientHeight:220});
 const months=Array.from({length:36},(_,i)=>({date:`2023-${String(i%12+1).padStart(2,'0')}-28`,strategy_return:.01,benchmark_return:.005}));
 const scenario={kpis:{cagr_pct:22,max_drawdown_pct:-18,sharpe:1.2,benchmark_cagr_pct:8,start:'2011',end:'2026'},months};
 const basket={date:'2026-09-25',risk_on:true,positions:[{ticker:'TEST.NS',weight:.6},{ticker:'EXAMPLE.NS',weight:.4}]};
-const manifest={backtest:{yearly:[]},research:{variants:{'1/1/10':{annual:[{year:2025,return_pct:12,bench_return_pct:8}],windows:[],active_window:null}}},holdings:{baskets:{'1/1/10':basket}},snapshot:{forward:[],basket}};
+const manifest={backtest:{yearly:[]},research:{variants:{'1/1/10':{annual:[{year:2025,return_pct:12,bench_return_pct:8},{year:2024,return_pct:-4,bench_return_pct:2}],windows:[{start:'2023',end:'2025',label:'2023–2025',cagr_pct:6,bench_cagr_pct:9,max_dd_pct:-12}],active_window:null}}},holdings:{baskets:{'1/1/10':basket}},snapshot:{forward:[],basket}};
 const paths={data_through:'2026-09-25',variants:{'1/1/10':scenario,'0/1/10':scenario,'0/1/6':scenario}};
 let requests=0;
 const fetch=async url=>{requests++;return{ok:true,json:async()=>url.endsWith('/scenarios')?paths:manifest}};
@@ -23,7 +23,11 @@ const document={getElementById:get,querySelectorAll:()=>buttons,createElement:()
 vm.runInNewContext(fs.readFileSync('dashboard/explorer.js','utf8'),{document,window:{ALPHEDGE_STATIC:false},fetch,Intl,Number,Math,Array,Error,setInterval:()=>{},Date});
 setTimeout(()=>{
  assert.equal(get('kpi-cagr').textContent,'22.00%');
- assert.equal(get('annual-results').children.length,1);
+ assert.equal(get('annual-results').children.length,2);
+ assert.ok(get('annual-results').children[0].children[1].classes.has('return-winner'));
+ assert.ok(get('annual-results').children[1].children[2].classes.has('return-winner'));
+ assert.ok(get('window-results').children[0].children[2].classes.has('return-winner'));
+ assert.ok(get('rolling-results').children[0].children[2].classes.has('return-winner'));
  assert.equal(get('candidate-positions').children.length,2);
  assert.match(get('contributed-total').textContent,/₹/);
  const before=requests;
