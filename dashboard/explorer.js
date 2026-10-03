@@ -167,9 +167,9 @@
   }
   document.querySelectorAll('[data-risk-control]').forEach(control=>{
     const input=$(control.dataset.riskControl);
-    control.querySelectorAll('[data-risk]').forEach((button,index)=>button.addEventListener('click',()=>{
+    control.querySelectorAll('[data-risk]').forEach(button=>button.addEventListener('click',()=>{
       input.value=button.dataset.risk;
-      control.style.setProperty('--risk-index',index);
+      control.dataset.active=button.dataset.risk;
       control.querySelectorAll('[data-risk]').forEach(choice=>choice.setAttribute('aria-pressed',String(choice===button)));
       if(input.id==='risk-profile'){revealedCharts.delete('growth-chart');renderBacktest();}
       else renderBasket();
