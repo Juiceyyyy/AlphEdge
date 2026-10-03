@@ -14,7 +14,8 @@ Object.assign(get('growth-chart'),{clientWidth:320,clientHeight:220});
 const months=Array.from({length:36},(_,i)=>({date:`2023-${String(i%12+1).padStart(2,'0')}-28`,strategy_return:.01,benchmark_return:.005}));
 const scenario={kpis:{cagr_pct:22,max_drawdown_pct:-18,sharpe:1.2,benchmark_cagr_pct:8,start:'2011',end:'2026'},months};
 const basket={date:'2026-09-25',risk_on:true,positions:[{ticker:'TEST.NS',weight:.6},{ticker:'EXAMPLE.NS',weight:.4}]};
-const manifest={backtest:{yearly:[]},research:{strategy_id:'hold-five-v1',variants:{'1/1/10/5':{annual:[{year:2025,return_pct:12,bench_return_pct:8},{year:2024,return_pct:-4,bench_return_pct:2}],windows:[{start:'2023',end:'2025',label:'2023–2025',cagr_pct:6,bench_cagr_pct:9,max_dd_pct:-12}],active_window:null}}},holdings:{strategy_id:'hold-five-v1',baskets:{'1/1/10/5':basket,'1/1/6/5':basket,'1/1/15/5':basket,'1/1/15/0':{date:'2026-09-25',risk_on:false,positions:[]}}},snapshot:{strategy_id:'hold-five-v1',forward:[],basket}};
+const benchmarkData={strategy_id:'hold-five-v1',data_through:'2026-09-25',initial:{midcap150:100,smallcap250:100},monthly:months.map((m,i)=>({date:m.date,midcap150:100*Math.pow(1.001,i),smallcap250:100*Math.pow(1.0005,i)}))};
+const manifest={benchmarks:benchmarkData,backtest:{yearly:[]},research:{strategy_id:'hold-five-v1',variants:{'1/1/10/5':{annual:[{year:2025,return_pct:12,bench_return_pct:8},{year:2024,return_pct:-4,bench_return_pct:2}],windows:[{start:'2023',end:'2025',label:'2023–2025',cagr_pct:6,bench_cagr_pct:9,max_dd_pct:-12}],active_window:null}}},holdings:{strategy_id:'hold-five-v1',baskets:{'1/1/10/5':basket,'1/1/6/5':basket,'1/1/15/5':basket,'1/1/15/0':{date:'2026-09-25',risk_on:false,positions:[]}}},snapshot:{strategy_id:'hold-five-v1',forward:[],basket}};
 const paths={strategy_id:'hold-five-v1',data_through:'2026-09-25',variants:{'1/1/10/5':scenario,'1/1/15/5':scenario,'0/1/10/0':scenario,'0/1/6/0':scenario}};
 let requests=0;
 const fetch=async url=>{requests++;return{ok:true,json:async()=>url.endsWith('/scenarios')?paths:manifest}};
@@ -34,6 +35,8 @@ setTimeout(()=>{
  assert.ok(get('rolling-results').children[0].children[2].classes.has('return-winner'));
  assert.equal(get('candidate-positions').children.length,2);
  assert.match(get('contributed-total').textContent,/₹/);
+ assert.match(get('midcap-total').textContent,/₹/);
+ assert.equal(get('growth-chart').children.filter(c=>c.attrs.stroke==='#ddac68').length,1);
  const before=requests;
  riskControls[0].querySelectorAll()[2].handlers.click();
  assert.equal(get('risk-profile').value,'aggressive');
