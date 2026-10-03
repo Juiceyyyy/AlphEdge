@@ -19,7 +19,11 @@ const paths={strategy_id:'hold-five-v1',data_through:'2026-09-25',variants:{'1/1
 let requests=0;
 const fetch=async url=>{requests++;return{ok:true,json:async()=>url.endsWith('/scenarios')?paths:manifest}};
 const buttons=['12','36','60','120','all'].map(p=>Object.assign(new Element(),{dataset:{period:p}}));
-const document={getElementById:get,querySelectorAll:()=>buttons,createElement:()=>new Element(),createElementNS:()=>new Element()};
+const riskControls=['risk-profile','model-risk-profile'].map(id=>{
+ const choices=['low','moderate','aggressive'].map(risk=>Object.assign(new Element(),{dataset:{risk}}));
+ return Object.assign(new Element(),{dataset:{riskControl:id},querySelectorAll:()=>choices,style:{setProperty(name,value){this[name]=value}}});
+});
+const document={getElementById:get,querySelectorAll:selector=>selector==='[data-risk-control]'?riskControls:buttons,createElement:()=>new Element(),createElementNS:()=>new Element()};
 vm.runInNewContext(fs.readFileSync('dashboard/explorer.js','utf8'),{document,window:{ALPHEDGE_STATIC:false},fetch,Intl,Number,Math,Array,Error,setInterval:()=>{},Date});
 setTimeout(()=>{
  assert.equal(get('kpi-cagr').textContent,'22.00%');
@@ -31,7 +35,9 @@ setTimeout(()=>{
  assert.equal(get('candidate-positions').children.length,2);
  assert.match(get('contributed-total').textContent,/₹/);
  const before=requests;
- get('risk-profile').value='aggressive';get('risk-profile').handlers.input();
+ riskControls[0].querySelectorAll()[2].handlers.click();
+ assert.equal(get('risk-profile').value,'aggressive');
+ assert.equal(riskControls[0].style['--risk-index'],2);
  get('model-holdings').value='6';get('model-holdings').handlers.input();
  assert.equal(requests,before,'controls replay cached paths without network calls');
  assert.match(get('chart-mode').textContent,/Saved path/);

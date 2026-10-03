@@ -165,11 +165,21 @@
     chart(use,'forward-chart',null,true);
     $('forward-chart').setAttribute('aria-label',reconstructed.length?'Retrospective 2026 backtest path from January':'Recorded daily model from first public snapshot');
   }
-  ['lump','sip','risk-profile','stock','holdings'].forEach(id=>{
+  document.querySelectorAll('[data-risk-control]').forEach(control=>{
+    const input=$(control.dataset.riskControl);
+    control.querySelectorAll('[data-risk]').forEach((button,index)=>button.addEventListener('click',()=>{
+      input.value=button.dataset.risk;
+      control.style.setProperty('--risk-index',index);
+      control.querySelectorAll('[data-risk]').forEach(choice=>choice.setAttribute('aria-pressed',String(choice===button)));
+      if(input.id==='risk-profile'){revealedCharts.delete('growth-chart');renderBacktest();}
+      else renderBasket();
+    }));
+  });
+  ['lump','sip','stock','holdings'].forEach(id=>{
     $(id).addEventListener('input',renderBacktest);
     $(id).addEventListener('change',()=>{revealedCharts.delete('growth-chart');renderBacktest();});
   });
-  ['model-risk-profile','model-stock','model-holdings'].forEach(id=>$(id).addEventListener('input',renderBasket));
+  ['model-stock','model-holdings'].forEach(id=>$(id).addEventListener('input',renderBasket));
   document.querySelectorAll('[data-period]').forEach(button=>button.addEventListener('click',()=>{activePeriod=button.dataset.period;revealedCharts.delete('growth-chart');document.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b===button));renderBacktest();}));
   ['start-month','end-month'].forEach(id=>$(id).addEventListener('input',()=>{activePeriod='custom';revealedCharts.delete('growth-chart');document.querySelectorAll('[data-period]').forEach(b=>b.classList.remove('active'));renderBacktest();}));
   async function staticJson(name) {
@@ -193,14 +203,14 @@
         if(!overview.ok||!paths.ok)throw Error('Saved data could not be fetched');
         manifest=await overview.json();scenarios=await paths.json();
       }
-      if(scenarios?.strategy_id!=='hold-five-v1'||manifest?.research?.strategy_id!=='hold-five-v1'||manifest?.holdings?.strategy_id!=='hold-five-v1'||manifest?.snapshot?.strategy_id!=='hold-five-v1'||!scenarios?.variants?.['1/1/10/5'])throw Error('The hold-five research cache is being rebuilt; try again after the next refresh');
+      if(scenarios?.strategy_id!=='hold-five-v1'||manifest?.research?.strategy_id!=='hold-five-v1'||manifest?.holdings?.strategy_id!=='hold-five-v1'||manifest?.snapshot?.strategy_id!=='hold-five-v1'||!scenarios?.variants?.['1/1/10/5'])throw Error('Updated research is being calculated. The page checks for verified results automatically.');
       const months=scenarios.variants['1/1/10/5'].months;
       $('start-month').min=months[0].date.slice(0,7);$('start-month').max=months.at(-1).date.slice(0,7);
       $('end-month').min=months[0].date.slice(0,7);$('end-month').max=months.at(-1).date.slice(0,7);
       if(!$('start-month').value)$('start-month').value=months[0].date.slice(0,7);
       if(!$('end-month').value)$('end-month').value=months.at(-1).date.slice(0,7);
       renderBacktest();renderBasket();forward();
-    }catch(e){inform(`Saved research could not load: ${e.message}. Please reload the page.`,true);set('candidate-status','Daily basket unavailable.');}
+    }catch(e){manifest=null;scenarios=null;inform(e.message.startsWith('Updated research')?e.message:`Saved research is temporarily unavailable (${e.message}). The page will retry automatically.`,true);set('chart-mode','Awaiting verified data');set('candidate-status','Updating the model basket. This page retries automatically.');}
   }
   if(typeof window.addEventListener==='function'){
     let resizeTimer;
@@ -209,5 +219,5 @@
       resizeTimer=setTimeout(()=>{if(manifest&&scenarios){renderBacktest();forward();}},120);
     });
   }
-  load();setInterval(load,15*60*1000);
+  load();setInterval(load,60*1000);
 })();
