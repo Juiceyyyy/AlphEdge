@@ -50,7 +50,7 @@ def build(path="state/scenarios.json"):
     for trend in (True, False):
         for stock in (True, False):
             for count in range(5, 11):
-                for retained in (range(count + 1) if trend else (0,)):
+                for retained in ((0, min(5, count)) if trend else (0,)):
                     mc = MomentumConfig(
                         rebalance_freq="M", n_hold=count,
                         lookback_short=cfg.lookback_short, lookback_long=cfg.lookback_long,

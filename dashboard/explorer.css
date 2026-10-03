@@ -90,3 +90,5 @@ h2,h3,h4,p{margin-top:0}h2{font:800 clamp(28px,3vw,40px)/1.2 Manrope,sans-serif;
   .totals strong{font-size:21px}.chart-wrap{height:220px}.forward-wrap{height:185px}
   .period-pills{gap:2px;padding:3px}.period-pills button{font-size:11px}
 }
+
+.risk-select{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);padding:11px 12px;min-height:44px;font-size:13px;cursor:pointer}.risk-select:focus-visible{outline:3px solid #a3ffd1;outline-offset:2px}

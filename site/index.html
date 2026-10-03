@@ -20,8 +20,8 @@
   <meta property="og:image:alt" content="AlphEdge systematic NSE equity research">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/svg+xml" href="/logo.svg?v=4">
-  <link rel="stylesheet" href="/styles.css?v=8">
-  <script>window.ALPHEDGE_STATIC=true</script><script src="/app.js?v=4" defer></script>
+  <link rel="stylesheet" href="/styles.css?v=9">
+  <script>window.ALPHEDGE_STATIC=true</script><script src="/app.js?v=5" defer></script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -42,7 +42,7 @@
           <p class="lead">A transparent look at a rules-based momentum strategy for NSE equities. Adjust an investment illustration, compare historical results, and see which stocks currently meet the model rules and their target weights.</p>
           <div class="hero-actions"><a class="button primary" href="#explorer">Explore the backtest</a><a class="text-link" href="#methodology">How it works</a></div>
         </div>
-        <div class="hero-note"><span class="note-index">01 / RESEARCH NOTE</span><p>The system ranks liquid stocks by six- and twelve-month momentum, sizes positions by volatility, and retains its strongest existing five when the Nifty trend weakens.</p><span class="note-foot">Historical simulations are not live returns</span></div>
+        <div class="hero-note"><span class="note-index">01 / RESEARCH NOTE</span><p>The system ranks liquid stocks by six- and twelve-month momentum, sizes positions by volatility, and lets you choose cash, retain-five, or fully invested behavior when the Nifty trend weakens.</p><span class="note-foot">Historical simulations are not live returns</span></div>
       </div>
     </section>
 
@@ -66,11 +66,10 @@
           <div class="timeframe"><span class="field-label">Timeframe</span><div class="period-pills" role="group" aria-label="Chart timeframe"><button type="button" data-period="12">1Y</button><button type="button" data-period="36">3Y</button><button type="button" data-period="60">5Y</button><button type="button" data-period="120" class="active">10Y</button><button type="button" data-period="all">All</button></div><details class="custom-period"><summary>Custom dates</summary><div class="date-range"><div class="control"><label for="start-month">From</label><input id="start-month" type="month"></div><div class="control"><label for="end-month">Through</label><input id="end-month" type="month"></div></div></details></div>
           <div class="rule"></div>
           <div class="control-head strategy-label"><h4>Strategy rules</h4><span>Instant saved scenarios</span></div>
-          <label class="switch-row"><span><strong>Nifty 200-day trend filter</strong><small>Keep strongest existing holdings below the moving average</small></span><input id="trend" type="checkbox" checked role="switch"><span class="switch-ui" aria-hidden="true"></span></label>
+          <div class="control"><div class="control-head"><label for="risk-profile">Risk appetite</label></div><select id="risk-profile" class="risk-select"><option value="low">Low · cash below Nifty 200-day</option><option value="moderate" selected>Moderate · keep strongest five</option><option value="aggressive">Aggressive · stay fully invested</option></select></div>
           <label class="switch-row"><span><strong>Stock 200-day filter</strong><small>Only select stocks above their moving average</small></span><input id="stock" type="checkbox" checked role="switch"><span class="switch-ui" aria-hidden="true"></span></label>
-          <div class="control hold"><div class="control-head"><label for="holdings">Target holdings</label><output id="holdings-value" for="holdings">10 stocks</output></div><input type="range" id="holdings" min="5" max="10" step="1" value="10"><div class="scale"><span>5</span><span>10</span></div></div>
-          <div class="control hold"><div class="control-head"><label for="retain">Risk-off holdings to keep</label><output id="retain-value" for="retain">5 stocks</output></div><input type="range" id="retain" min="0" max="10" step="1" value="5"><div class="scale"><span>0 · all cash</span><span>Up to all holdings</span></div></div>
-          <p class="control-hint">Saved 5–10-stock strategy paths switch instantly. Your deposit, monthly contribution and time range always redraw locally. The public scenario cache refreshes after completed trading sessions.</p>
+          <div class="control hold"><div class="control-head"><label for="holdings">Target holdings</label><output id="holdings-value" for="holdings">10 stocks</output></div><input type="range" id="holdings" min="5" max="10" step="1" value="10"><div class="scale"><span>5</span><span>10</span></div></div></div>
+          <p class="control-hint">Three risk profiles and 5–10-stock paths switch instantly. Your deposit, monthly contribution and time range always redraw locally. The public scenario cache refreshes after completed trading sessions.</p>
         </aside>
         <div class="results">
           <div class="chart-card card">
@@ -93,12 +92,11 @@
       <div class="holdings-layout">
         <aside class="controls card" aria-label="Model holdings settings">
           <div class="card-head"><h3>Model rules</h3><span class="chip">Independent</span></div>
-          <label class="switch-row"><span><strong>Nifty 200-day trend filter</strong><small>Keep strongest existing holdings below the average</small></span><input id="model-trend" type="checkbox" checked role="switch"><span class="switch-ui" aria-hidden="true"></span></label>
+          <div class="control"><div class="control-head"><label for="model-risk-profile">Risk appetite</label></div><select id="model-risk-profile" class="risk-select"><option value="low">Low · cash below Nifty 200-day</option><option value="moderate" selected>Moderate · keep strongest five</option><option value="aggressive">Aggressive · stay fully invested</option></select></div>
           <label class="switch-row"><span><strong>Stock 200-day filter</strong><small>Screen stocks by their trend</small></span><input id="model-stock" type="checkbox" checked role="switch"><span class="switch-ui" aria-hidden="true"></span></label>
-          <div class="control hold"><div class="control-head"><label for="model-holdings">Target holdings</label><output id="model-holdings-value" for="model-holdings">10 stocks</output></div><input type="range" id="model-holdings" min="5" max="10" step="1" value="10"><div class="scale"><span>5</span><span>10</span></div></div>
-          <div class="control hold"><div class="control-head"><label for="model-retain">Risk-off holdings to keep</label><output id="model-retain-value" for="model-retain">5 stocks</output></div><input type="range" id="model-retain" min="0" max="10" step="1" value="5"><div class="scale"><span>0 · all cash</span><span>Up to all holdings</span></div></div>
+          <div class="control hold"><div class="control-head"><label for="model-holdings">Target holdings</label><output id="model-holdings-value" for="model-holdings">10 stocks</output></div><input type="range" id="model-holdings" min="5" max="10" step="1" value="10"><div class="scale"><span>5</span><span>10</span></div></div></div>
         </aside>
-        <div class="card holdings-card"><div class="card-head"><div><h3>Research basket</h3><span id="candidate-status" class="candidate-status" role="status" aria-live="polite">Loading saved target holdings…</span></div></div><div id="candidate-positions" class="position-list" aria-live="polite"></div><p class="basket-note">Risk-off holdings retain their existing weight and the rest remains cash. A zero-retention setting moves fully to cash. This is a research model, not actual investments.</p></div>
+        <div class="card holdings-card"><div class="card-head"><div><h3>Research basket</h3><span id="candidate-status" class="candidate-status" role="status" aria-live="polite">Loading saved target holdings…</span></div></div><div id="candidate-positions" class="position-list" aria-live="polite"></div><p class="basket-note">Low moves to cash below the Nifty 200-day average; moderate retains five existing names; aggressive ignores that market filter. This is a research model, not actual investments.</p></div>
       </div>
     </section>
 
@@ -112,7 +110,7 @@
       <div class="method-grid">
         <article><span class="method-index">01</span><h3>Find liquid stocks</h3><p>Start with NSE index constituents and rank candidates by their average daily traded value over roughly three months.</p></article>
         <article><span class="method-index">02</span><h3>Rank momentum</h3><p>Blend six- and twelve-month price returns, ignoring the latest 21 trading days. Select the strongest eligible names.</p></article>
-        <article><span class="method-index">03</span><h3>Control exposure</h3><p>Use inverse volatility weights. The 200-day filters screen individual stocks and the broader Nifty trend. On a risk-off signal the model retains only the strongest existing holdings and keeps the rest in cash.</p></article>
+        <article><span class="method-index">03</span><h3>Control exposure</h3><p>Use inverse volatility weights. Choose low (cash below the Nifty 200-day), moderate (retain five existing holdings and cash), or aggressive (keep buying without the Nifty trend filter). The optional stock 200-day screen remains independent.</p></article>
         <article><span class="method-index">04</span><h3>Review the model basket</h3><p>Apply the rules to the latest available closing prices. Show each eligible stock’s target weight and the price date; recalculate when settings change.</p></article>
       </div>
       <div class="research-note"><div><span class="kicker">READ THE RESULTS CAREFULLY</span><h3>Backtests are research, not a return promise.</h3></div><p>The saved configuration was selected using historical data. Current index membership, execution assumptions and changing market conditions can make simulated results too optimistic. The three-year windows reuse that selected configuration and are not independent prospective results. Market prices and constituents are provided by external data sources.</p></div>

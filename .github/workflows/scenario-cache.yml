@@ -14,7 +14,7 @@ permissions:
   contents: write
 concurrency:
   group: historical-scenario-cache
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-latest
