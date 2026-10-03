@@ -31,8 +31,8 @@ jobs:
           from pathlib import Path
           page = Path('site/index.html').read_text()
           assert 'window.ALPHEDGE_STATIC=true' in page
-          assert 'src="/app.js?v=8"' in page
-          assert 'href="/styles.css?v=11"' in page
+          assert 'src="/app.js?v=9"' in page
+          assert 'href="/styles.css?v=12"' in page
           assert '/explore/app.js' not in page
           for asset in ('app.js', 'styles.css'):
               assert (Path('site') / asset).is_file()

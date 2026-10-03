@@ -87,6 +87,9 @@
     const basket=cached || (basketKey()==='1/1/10/5'?manifest.snapshot?.basket:null);
     const list=$('candidate-positions');list.replaceChildren();
     if(!basket){set('candidate-status','Saved model basket is awaiting the next daily refresh.');return;}
+    set('basket-note',!basket.risk_on && $('model-risk-profile').value==='moderate'
+      ? 'These are five positions retained from this model’s earlier holdings, ranked by current momentum. Aggressive reselects independently, so its present basket may differ. Target weights are research estimates, not actual investments.'
+      : 'Target weights from the research model, not actual investments.');
     set('candidate-status',`Prices through ${basket.date} · ${basket.risk_on?'Invested model':'Retained holdings + cash'} · saved daily`);
     if(!basket.positions.length){const div=document.createElement('div');div.className='empty-state';div.textContent=basket.risk_on?'No eligible names on this price date.':'No existing holdings retained under this setting; target is cash.';list.append(div);return;}
     const allocated=basket.positions.reduce((sum,p)=>sum+p.weight,0);
