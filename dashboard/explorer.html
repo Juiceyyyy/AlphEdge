@@ -20,8 +20,8 @@
   <meta property="og:image:alt" content="AlphEdge systematic NSE equity research">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/svg+xml" href="/explore/logo.svg?v=4">
-  <link rel="stylesheet" href="/explore/styles.css?v=9">
-  <script src="/explore/app.js?v=5" defer></script>
+  <link rel="stylesheet" href="/explore/styles.css?v=10">
+  <script src="/explore/app.js?v=6" defer></script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -66,9 +66,9 @@
           <div class="timeframe"><span class="field-label">Timeframe</span><div class="period-pills" role="group" aria-label="Chart timeframe"><button type="button" data-period="12">1Y</button><button type="button" data-period="36">3Y</button><button type="button" data-period="60">5Y</button><button type="button" data-period="120" class="active">10Y</button><button type="button" data-period="all">All</button></div><details class="custom-period"><summary>Custom dates</summary><div class="date-range"><div class="control"><label for="start-month">From</label><input id="start-month" type="month"></div><div class="control"><label for="end-month">Through</label><input id="end-month" type="month"></div></div></details></div>
           <div class="rule"></div>
           <div class="control-head strategy-label"><h4>Strategy rules</h4><span>Instant saved scenarios</span></div>
-          <div class="control"><div class="control-head"><label for="risk-profile">Risk appetite</label></div><select id="risk-profile" class="risk-select"><option value="low">Low · cash below Nifty 200-day</option><option value="moderate" selected>Moderate · keep strongest five</option><option value="aggressive">Aggressive · stay fully invested</option></select></div>
+          <div class="control"><div class="control-head"><span id="risk-label">Risk appetite</span></div><input id="risk-profile" type="hidden" value="moderate"><div class="risk-segment" data-risk-control="risk-profile" role="group" aria-labelledby="risk-label" aria-describedby="risk-explanation"><span class="risk-pill" aria-hidden="true"></span><button type="button" data-risk="low" aria-pressed="false">Low</button><button type="button" data-risk="moderate" aria-pressed="true">Moderate</button><button type="button" data-risk="aggressive" aria-pressed="false">Aggressive</button></div></div>
           <label class="switch-row"><span><strong>Stock 200-day filter</strong><small>Only select stocks above their moving average</small></span><input id="stock" type="checkbox" checked role="switch"><span class="switch-ui" aria-hidden="true"></span></label>
-          <div class="control hold"><div class="control-head"><label for="holdings">Target holdings</label><output id="holdings-value" for="holdings">10 stocks</output></div><input type="range" id="holdings" min="5" max="10" step="1" value="10"><div class="scale"><span>5</span><span>10</span></div></div></div>
+          <div class="control hold"><div class="control-head"><label for="holdings">Target holdings</label><output id="holdings-value" for="holdings">10 stocks</output></div><input type="range" id="holdings" min="5" max="10" step="1" value="10"><div class="scale"><span>5</span><span>10</span></div></div>
           <p class="control-hint">Three risk profiles and 5–10-stock paths switch instantly. Your deposit, monthly contribution and time range always redraw locally. The public scenario cache refreshes after completed trading sessions.</p>
         </aside>
         <div class="results">
@@ -92,11 +92,11 @@
       <div class="holdings-layout">
         <aside class="controls card" aria-label="Model holdings settings">
           <div class="card-head"><h3>Model rules</h3><span class="chip">Independent</span></div>
-          <div class="control"><div class="control-head"><label for="model-risk-profile">Risk appetite</label></div><select id="model-risk-profile" class="risk-select"><option value="low">Low · cash below Nifty 200-day</option><option value="moderate" selected>Moderate · keep strongest five</option><option value="aggressive">Aggressive · stay fully invested</option></select></div>
+          <div class="control"><div class="control-head"><span id="model-risk-label">Risk appetite</span></div><input id="model-risk-profile" type="hidden" value="moderate"><div class="risk-segment" data-risk-control="model-risk-profile" role="group" aria-labelledby="model-risk-label" aria-describedby="risk-explanation"><span class="risk-pill" aria-hidden="true"></span><button type="button" data-risk="low" aria-pressed="false">Low</button><button type="button" data-risk="moderate" aria-pressed="true">Moderate</button><button type="button" data-risk="aggressive" aria-pressed="false">Aggressive</button></div></div>
           <label class="switch-row"><span><strong>Stock 200-day filter</strong><small>Screen stocks by their trend</small></span><input id="model-stock" type="checkbox" checked role="switch"><span class="switch-ui" aria-hidden="true"></span></label>
-          <div class="control hold"><div class="control-head"><label for="model-holdings">Target holdings</label><output id="model-holdings-value" for="model-holdings">10 stocks</output></div><input type="range" id="model-holdings" min="5" max="10" step="1" value="10"><div class="scale"><span>5</span><span>10</span></div></div></div>
+          <div class="control hold"><div class="control-head"><label for="model-holdings">Target holdings</label><output id="model-holdings-value" for="model-holdings">10 stocks</output></div><input type="range" id="model-holdings" min="5" max="10" step="1" value="10"><div class="scale"><span>5</span><span>10</span></div></div>
         </aside>
-        <div class="card holdings-card"><div class="card-head"><div><h3>Research basket</h3><span id="candidate-status" class="candidate-status" role="status" aria-live="polite">Loading saved target holdings…</span></div></div><div id="candidate-positions" class="position-list" aria-live="polite"></div><p class="basket-note">Low moves to cash below the Nifty 200-day average; moderate retains five existing names; aggressive ignores that market filter. This is a research model, not actual investments.</p></div>
+        <div class="card holdings-card"><div class="card-head"><div><h3>Research basket</h3><span id="candidate-status" class="candidate-status" role="status" aria-live="polite">Loading saved target holdings…</span></div></div><div id="candidate-positions" class="position-list" aria-live="polite"></div><p class="basket-note">Target weights from the research model, not actual investments.</p></div>
       </div>
     </section>
 
@@ -107,6 +107,7 @@
 
     <section class="section-tint method" id="methodology" aria-labelledby="method-heading"><div class="shell">
       <div class="section-top"><div><span class="kicker">07 / THE LOGIC</span><h2 id="method-heading">A simple idea, with explicit rules</h2></div></div>
+      <div id="risk-explanation" class="risk-explanation"><h3>How risk appetite changes the market filter</h3><div class="risk-options"><p><strong>Low</strong><span>Below the Nifty 200-day average, move the model to cash and pause new purchases.</span></p><p><strong>Moderate</strong><span>Below that average, keep the five strongest existing positions and hold the rest in cash.</span></p><p><strong>Aggressive</strong><span>Ignore the Nifty market filter and stay invested in the selected stocks.</span></p></div></div>
       <div class="method-grid">
         <article><span class="method-index">01</span><h3>Find liquid stocks</h3><p>Start with NSE index constituents and rank candidates by their average daily traded value over roughly three months.</p></article>
         <article><span class="method-index">02</span><h3>Rank momentum</h3><p>Blend six- and twelve-month price returns, ignoring the latest 21 trading days. Select the strongest eligible names.</p></article>
