@@ -29,7 +29,7 @@ class DeliveryError(RuntimeError):
 
 
 def money(value):
-    return f"₹{value:,.0f}"
+    return f"{'-' if value < 0 else ''}₹{abs(value):,.0f}"
 
 
 def percent(value):
@@ -109,13 +109,16 @@ def subscribed_performance(subscriber, forward):
     model = nifty = paid = initial
     last_month = forward[first]["date"][:7]
     peak = forward[first]["model_index"]
-    drawdown = 0.0
+    nifty_peak = forward[first]["benchmark_index"]
+    drawdown = nifty_drawdown = 0.0
     for previous, current in zip(forward[first:-1], forward[first + 1:]):
         model *= current["model_index"] / previous["model_index"]
         nifty *= current["benchmark_index"] / previous["benchmark_index"]
         # Drawdown uses index units; new deposits cannot hide a loss.
         peak = max(peak, current["model_index"])
         drawdown = min(drawdown, current["model_index"] / peak - 1)
+        nifty_peak = max(nifty_peak, current["benchmark_index"])
+        nifty_drawdown = min(nifty_drawdown, current["benchmark_index"] / nifty_peak - 1)
         month = current["date"][:7]
         if month != last_month:
             model += monthly
@@ -125,7 +128,8 @@ def subscribed_performance(subscriber, forward):
     return {"since": forward[first]["date"], "model": model, "nifty": nifty,
             "paid": paid, "model_pct": (model / paid - 1) * 100,
             "nifty_pct": (nifty / paid - 1) * 100,
-            "drawdown_pct": drawdown * 100}
+            "drawdown_pct": drawdown * 100,
+            "nifty_drawdown_pct": nifty_drawdown * 100}
 
 
 def ranking_lines(holdings):
@@ -186,10 +190,10 @@ def report(subscriber, snapshot, holdings):
         if performance:
             lines += [f"From market close: {performance['since']}",
                       f"Contributed: {money(performance['paid'])}",
-                      f"AlphEdge model: {money(performance['model'])} ({percent(performance['model_pct'])} vs contributions)",
-                      f"Nifty 50 price index: {money(performance['nifty'])} ({percent(performance['nifty_pct'])} vs contributions)",
+                      f"AlphEdge model: {money(performance['model'])} | P/L {money(performance['model'] - performance['paid'])} | {percent(performance['model_pct'])}",
+                      f"Nifty 50 price index: {money(performance['nifty'])} | P/L {money(performance['nifty'] - performance['paid'])} | {percent(performance['nifty_pct'])}",
                       f"Difference: {performance['model_pct'] - performance['nifty_pct']:+.2f} percentage points",
-                      f"Model drawdown since start: {percent(performance['drawdown_pct'])}"]
+                      f"Worst drawdown: model {percent(performance['drawdown_pct'])} | Nifty {percent(performance['nifty_drawdown_pct'])}"]
         else:
             lines.append("Starts after the next completed market close.")
         lines.append(f"Assumptions: {money(subscriber['capital'])} initial + {money(subscriber['sip'])}/month; no personal trades, tax or broker fees.")
