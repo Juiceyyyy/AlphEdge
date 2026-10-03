@@ -74,3 +74,7 @@ node tests/research_ui_smoke.cjs
 ```
 
 The tests check logic and safety gates; they do not establish strategy profitability, broker connectivity, or live execution. Never commit `.env`, access tokens, private journals, cache databases, or personal holdings to a public fork. [MIT license](LICENSE).
+
+### Benchmark comparisons
+
+The site compares the saved strategy path with the Nifty 50, Nifty Midcap 150, and Nifty Smallcap 250 price indices. The latter two monthly checkpoints are derived from official [NSE Indices historical price levels](https://www.niftyindices.com/reports/historical-data) by `python -m jobs.build_benchmarks`. The free GitHub Actions scenario-cache job refreshes the data after market close and publishes `state/benchmarks.json` and `site/data/benchmarks.json`. These are price indices, so dividends are excluded; contribution illustrations are hypothetical and do not represent investable index fund returns. Missing or stale index data is never substituted with zero returns.
