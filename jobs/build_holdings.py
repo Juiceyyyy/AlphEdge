@@ -29,7 +29,7 @@ def build():
         if latest['date'] != ranking['date']:
             raise RuntimeError('Current baskets and historical scenario dates disagree')
         baskets[key] = {**latest, 'settings': {'key': key},
-                        'method': 'Actual simulated basket at the latest close; weights include residual cash.'}
+                        'method': 'Simulated target after the latest close; weights include residual cash. Pending fills would occur on the next session.'}
     payload = {'strategy_id': 'hold-five-v1',
                'computed_at': datetime.now(timezone.utc).isoformat(),
                'price_date': ranking['date'], 'baskets': baskets}
