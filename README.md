@@ -50,6 +50,20 @@ To enable it for this repository's maintainer:
 
 Only ciphertext is committed as `state/telegram_subscribers.enc` in this public repository. It contains the Telegram update offset and the subscribers' chat IDs and assumptions, protected by the separate Actions secret. Deleting the file resets the bot's subscription and update state, while removing the key without clearing the file will cause the job to fail safely. Telegram messages themselves are visible to the subscriber and to Telegram. The workflow sends model reports only; it cannot trade or infer an account's actual positions.
 
+### Near-instant replies on a free Cloudflare Worker
+
+`worker/telegram.mjs` implements the same opt-in report with a Telegram webhook for near-instant commands. It stores private subscriber settings in your own Cloudflare KV namespace; a free Worker cron checks for the first fresh close of each month and changes to the default Nifty trend state. It reads the same committed research snapshots as the site and fails closed when data is stale or mismatched. Worker/KV free quotas apply. GitHub Actions still updates the model data; the Worker only handles messages. Deploy this **before switching off GitHub polling**:
+
+1. Create a Cloudflare account on the **Workers Free** plan. Install Node 22 locally and, from the repository root, run `npx wrangler login`.
+2. Copy `wrangler.toml.example` to `wrangler.toml`. Run `npx wrangler kv namespace create SUBSCRIBERS` and copy the returned namespace ID into `wrangler.toml`. The local config is git-ignored.
+3. Run `npx wrangler secret put BOT_TOKEN` and paste your Telegram BotFather token when prompted. Generate a separate URL-safe secret with `python -c "import secrets; print(secrets.token_urlsafe(32))"`; save it privately, then run `npx wrangler secret put WEBHOOK_SECRET` and paste it when prompted. Never put either value in a source file, command argument, or screenshot.
+4. Run `npx wrangler deploy` and note the `https://...workers.dev` URL. Open its `/health` URL; it should show `ready: true`. If it does not, check the KV binding and Worker secrets.
+5. Change GitHub Actions **repository variable** `TELEGRAM_ENABLED` to `false`. This stops the polling workflow; keep its encrypted state and secrets until the webhook has been verified.
+6. In PowerShell, run `$webhookKey = Read-Host 'Paste your WEBHOOK_SECRET'`, then `$workerUrl = 'https://YOUR-WORKER.workers.dev'` with your actual deployed URL. Run `Invoke-RestMethod -Method Post -Uri "$workerUrl/setup" -Headers @{'X-Setup-Key'=$webhookKey}`. A `webhook_set: true` response confirms that Telegram will send updates directly to the Worker. Run `Remove-Variable webhookKey` afterward.
+7. Send `/start` again in the bot and check the immediate confirmation, followed by `/now` and `/settings`. Subscriptions from the old GitHub polling version are **not automatically imported**; the new `/start` becomes the forward comparison's subscription date. Only after this test should you remove unused GitHub Telegram secrets and the earlier encrypted state if desired.
+
+The webhook accepts Telegram messages only when its secret header matches. The `/setup` endpoint also requires that secret, and neither endpoint exposes the bot token. **Do not register a webhook while the GitHub polling bot is still enabled**: Telegram does not support `getUpdates` polling while a webhook is active. Switching back requires deleting the webhook through the Telegram Bot API before re-enabling GitHub polling. KV is eventually consistent across Cloudflare locations; extremely rapid successive setting changes may briefly display the previous setting. The Worker is for research alerts, not urgent order execution.
+
 ## Connect **your own** Kite account (local only)
 
 This runner is an opt-in reference integration for **NSE cash-and-carry (CNC)**. It supports only a single account on a trusted machine. It is not a multi-user brokerage service. The public web and cron job never import, store or request Kite credentials.
@@ -69,6 +83,7 @@ Confirm current Kite order API and registered-IP requirements with the broker be
 python -m compileall -q alpha_strategy dashboard broker jobs
 python -m unittest discover -s tests -p 'test_*.py'
 node --check dashboard/explorer.js
+node --test worker/telegram.test.mjs
 node tests/research_ui_smoke.cjs
 ```
 
