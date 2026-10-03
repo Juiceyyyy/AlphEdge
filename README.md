@@ -35,6 +35,21 @@ The primary live site is the static export at [alph-edge.vercel.app](https://alp
 
 The 2026 timeline is a reconstructed historical simulation from January, **not** a prospective performance record. The separately saved forward observations begin on the first actual daily snapshot and are never spliced onto earlier reconstructed values. The published backtest uses monthly rebalancing; the optional local broker policy below uses quarterly reviews and has **no claimed backtested return**. The window review reuses the historically selected configuration; it is not an independent out-of-sample walk-forward training exercise. Historical constituent membership and execution can differ.
 
+## Optional Telegram research alerts
+
+The opt-in bot posts a complete report **inside the Telegram chat** after the first updated trading close of each month, and again if the default model's Nifty 200-day trend state changes. It checks commands hourly using GitHub Actions, so replies can take up to an hour or longer if Actions is delayed. `/now` requests the current report; `/settings`, `/capital 10000`, `/sip 5000`, `/kpis on`, and `/stop` configure or remove a subscription. It only sends to private chats that have issued `/start`. No broker credentials are involved.
+
+Each report includes the close date, default model's trend state and equity/cash split, its complete target stock weights, changes since the previous alert, the underlying top-15 momentum ranking even while the model targets cash, and optional hypothetical model versus Nifty 50 values since the subscriber's first subsequent market close. The capital and SIP assumptions apply equally to both paths. The figures are a forward research-index illustration: they are **not actual account performance**, and omit trading costs, tax, dividends, integer-share restrictions, and missed fills. Changing capital or SIP recalculates the illustration from the subscriber's original start date. The bot uses the existing **10-stock, monthly, full-cash-below-200-SMA** model. The proposed keep-five and half-sale variants require separately validated and tracked forward series before any subscriber KPIs can be attributed to them.
+
+To enable it for this repository's maintainer:
+
+1. Create a bot using Telegram's `@BotFather` and keep the token private. Do not put it in `.env.example`, a commit, a workflow log, or the public site.
+2. Generate one Fernet key locally with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Keep a backup: losing it makes the encrypted subscriber state unreadable. Never rotate it without decrypting and re-encrypting the state first.
+3. In GitHub **Settings → Secrets and variables → Actions**, set repository secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_STATE_KEY`; set repository variable `TELEGRAM_ENABLED` to `true` only when ready to send messages. The workflow does nothing without that variable.
+4. In the Actions tab, run **Telegram research updates** manually once to verify it, then send `/start` to your new bot and run the workflow again to check the initial response. The normal hourly schedule then takes over. Do not paste the bot token into a browser URL, issue, or support request.
+
+Only ciphertext is committed as `state/telegram_subscribers.enc` in this public repository. It contains the Telegram update offset and the subscribers' chat IDs and assumptions, protected by the separate Actions secret. Deleting the file resets the bot's subscription and update state, while removing the key without clearing the file will cause the job to fail safely. Telegram messages themselves are visible to the subscriber and to Telegram. The workflow sends model reports only; it cannot trade or infer an account's actual positions.
+
 ## Connect **your own** Kite account (local only)
 
 This runner is an opt-in reference integration for **NSE cash-and-carry (CNC)**. It supports only a single account on a trusted machine. It is not a multi-user brokerage service. The public web and cron job never import, store or request Kite credentials.

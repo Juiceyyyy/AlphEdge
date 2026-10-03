@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
+# SPDX-License-Identifier: MIT
+name: Telegram research updates
+on:
+  schedule:
+    - cron: '23 * * * *' # Hourly command pickup; monthly/risk reports only after new cache data.
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: telegram-research-state
+  cancel-in-progress: false
+jobs:
+  notify:
+    if: vars.TELEGRAM_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Process private commands and new research close
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_STATE_KEY: ${{ secrets.TELEGRAM_STATE_KEY }}
+        run: python -m jobs.telegram_report both
+      - name: Persist encrypted subscriptions
+        run: |
+          git add state/telegram_subscribers.enc
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Update encrypted Telegram subscriber state'
+          git pull --rebase origin main
+          git push origin HEAD:main
