@@ -19,7 +19,7 @@ class RefreshTest(unittest.TestCase):
     def test_next_close_uses_previous_basket_and_publishes_once(self):
         basket={"date":"2026-09-25","benchmark_close":100.0,"risk_on":True,
                 "positions":[{"ticker":"EXAMPLE.NS","price":50.0,"weight":1.0}]}
-        previous={"price_date":"2026-09-25","basket":basket,
+        previous={"strategy_id": "hold-five-v1", "price_date":"2026-09-25","basket":basket,
                   "forward":[{"date":"2026-09-25","model_index":100.0,"benchmark_index":100.0}]}
         data={"^NSEI":pd.DataFrame({"Close":[101.0]},index=pd.to_datetime(["2026-09-28"])),
               "EXAMPLE.NS":pd.DataFrame({"Close":[55.0]},index=pd.to_datetime(["2026-09-28"]))}
@@ -31,7 +31,7 @@ class RefreshTest(unittest.TestCase):
         self.assertEqual(snapshot["basket"]["positions"][0]["price"],55)
 
     def test_missing_close_never_publishes(self):
-        previous={"price_date":"2026-09-25","basket":{"date":"2026-09-25","benchmark_close":100,
+        previous={"strategy_id": "hold-five-v1", "price_date":"2026-09-25","basket":{"date":"2026-09-25","benchmark_close":100,
                   "positions":[{"ticker":"MISSING.NS","price":50,"weight":1}]},
                   "forward":[{"date":"2026-09-25","model_index":100,"benchmark_index":100}]}
         data={"^NSEI":pd.DataFrame({"Close":[101]},index=pd.to_datetime(["2026-09-28"]))}

@@ -39,6 +39,8 @@ def summary(months, label=None):
 
 def compile_cache(scenarios, previous=None):
     previous = previous or {}
+    if previous.get('strategy_id') != scenarios.get('strategy_id'):
+        previous = {}  # model changes invalidate frozen annual and window results
     through = date.fromisoformat(scenarios['data_through'])
     archived = dict(previous.get('archived', {}))
     archived_windows = dict(previous.get('archived_windows', {}))
@@ -73,7 +75,7 @@ def compile_cache(scenarios, previous=None):
         windows = [frozen_windows[k] for k in sorted(frozen_windows)]
         active = summary(months[-36:], 'Trailing 36 months · active') if len(months) >= 36 else None
         variants[key] = {'annual': annual, 'windows': windows, 'active_window': active}
-    return {'data_through': scenarios['data_through'], 'archived': archived,
+    return {'strategy_id': scenarios.get('strategy_id'), 'data_through': scenarios['data_through'], 'archived': archived,
             'archived_windows': archived_windows,
             'variants': variants, 'method': 'Monthly backtest checkpoints. Completed calendar years archived; current year and trailing window refreshed from latest completed close.'}
 

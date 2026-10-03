@@ -49,23 +49,30 @@ def build(path="state/scenarios.json"):
     variants = {}
     for trend in (True, False):
         for stock in (True, False):
-            for count in range(5, 16):
-                mc = MomentumConfig(
-                    rebalance_freq="M", n_hold=count,
-                    lookback_short=cfg.lookback_short, lookback_long=cfg.lookback_long,
-                    momentum_skip=cfg.momentum_skip, weight_short=cfg.weight_short,
-                    weight_long=cfg.weight_long, weighting=cfg.weighting,
-                    vol_window=cfg.vol_window, require_above_ma=stock,
-                    long_ma_window=cfg.long_ma_window, use_trend_filter=trend,
-                    trend_filter_window=cfg.trend_filter_window,
-                    min_momentum=cfg.min_momentum,
-                    target_total_exposure=cfg.target_total_exposure)
-                result = run_momentum_backtest(cfg, years=15, top_n=cfg.top_n_by_adtv,
-                    mc=mc, verbose=False, prepared_data=data, prepared_universe=universe)
-                key = f"{int(trend)}/{int(stock)}/{count}"
-                variants[key] = {"months": monthly_path(result), "kpis": result.kpis()}
-                print(f"Built {key}: {len(variants[key]['months'])} monthly points", flush=True)
-    payload = {"computed_at": datetime.now(timezone.utc).isoformat(),
+            for count in range(5, 11):
+                for retained in (range(count + 1) if trend else (0,)):
+                    mc = MomentumConfig(
+                        rebalance_freq="M", n_hold=count,
+                        lookback_short=cfg.lookback_short, lookback_long=cfg.lookback_long,
+                        momentum_skip=cfg.momentum_skip, weight_short=cfg.weight_short,
+                        weight_long=cfg.weight_long, weighting=cfg.weighting,
+                        vol_window=cfg.vol_window, require_above_ma=stock,
+                        long_ma_window=cfg.long_ma_window, use_trend_filter=trend,
+                        trend_filter_window=cfg.trend_filter_window,
+                        min_momentum=cfg.min_momentum,
+                        target_total_exposure=cfg.target_total_exposure,
+                        risk_off_hold_count=retained)
+                    result = run_momentum_backtest(cfg, years=15, top_n=cfg.top_n_by_adtv,
+                        mc=mc, verbose=False, prepared_data=data, prepared_universe=universe)
+                    key = f"{int(trend)}/{int(stock)}/{count}/{retained if trend else 0}"
+                    last_signal = next((t['risk_on'] for t in reversed(result.trades)
+                                        if t.get('type') == 'rebalance'), True)
+                    variants[key] = {"months": monthly_path(result), "kpis": result.kpis(),
+                                     "latest": {"date": result.equity_curve.index[-1].strftime('%Y-%m-%d'),
+                                                "risk_on": last_signal,
+                                                "positions": result.latest_positions}}
+                    print(f"Built {key}: {len(variants[key]['months'])} monthly points", flush=True)
+    payload = {"strategy_id": "hold-five-v1", "computed_at": datetime.now(timezone.utc).isoformat(),
                "data_through": data[cfg.benchmark_ticker].index.max().strftime("%Y-%m-%d"),
                "method": "Historical backtests with shared market data and today's constituent universe. Selected model; not independent out-of-sample validation.",
                "variants": variants}

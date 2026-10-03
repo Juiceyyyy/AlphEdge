@@ -25,6 +25,7 @@ class StrategyConfig:
 
     # Momentum signal
     n_hold: int = 10
+    risk_off_hold_count: int = 5  # keep strongest existing positions; 0 = sell all
     rebalance_freq: str = "M"
     lookback_short: int = 126
     lookback_long: int = 252

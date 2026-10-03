@@ -9,13 +9,13 @@ class Element{
 }
 const els=new Map(),get=id=>els.get(id)||(els.set(id,new Element()),els.get(id));
 Object.assign(get('lump'),{value:'100000'});Object.assign(get('sip'),{value:'10000'});
-Object.assign(get('holdings'),{value:'10'});Object.assign(get('model-holdings'),{value:'10'});
+Object.assign(get('holdings'),{value:'10'});Object.assign(get('model-holdings'),{value:'10'});Object.assign(get('retain'),{value:'5'});Object.assign(get('model-retain'),{value:'5'});
 Object.assign(get('growth-chart'),{clientWidth:320,clientHeight:220});
 const months=Array.from({length:36},(_,i)=>({date:`2023-${String(i%12+1).padStart(2,'0')}-28`,strategy_return:.01,benchmark_return:.005}));
 const scenario={kpis:{cagr_pct:22,max_drawdown_pct:-18,sharpe:1.2,benchmark_cagr_pct:8,start:'2011',end:'2026'},months};
 const basket={date:'2026-09-25',risk_on:true,positions:[{ticker:'TEST.NS',weight:.6},{ticker:'EXAMPLE.NS',weight:.4}]};
-const manifest={backtest:{yearly:[]},research:{variants:{'1/1/10':{annual:[{year:2025,return_pct:12,bench_return_pct:8},{year:2024,return_pct:-4,bench_return_pct:2}],windows:[{start:'2023',end:'2025',label:'2023–2025',cagr_pct:6,bench_cagr_pct:9,max_dd_pct:-12}],active_window:null}}},holdings:{baskets:{'1/1/10':basket}},snapshot:{forward:[],basket}};
-const paths={data_through:'2026-09-25',variants:{'1/1/10':scenario,'0/1/10':scenario,'0/1/6':scenario}};
+const manifest={backtest:{yearly:[]},research:{strategy_id:'hold-five-v1',variants:{'1/1/10/5':{annual:[{year:2025,return_pct:12,bench_return_pct:8},{year:2024,return_pct:-4,bench_return_pct:2}],windows:[{start:'2023',end:'2025',label:'2023–2025',cagr_pct:6,bench_cagr_pct:9,max_dd_pct:-12}],active_window:null}}},holdings:{strategy_id:'hold-five-v1',baskets:{'1/1/10/5':basket,'1/1/6/5':basket}},snapshot:{strategy_id:'hold-five-v1',forward:[],basket}};
+const paths={strategy_id:'hold-five-v1',data_through:'2026-09-25',variants:{'1/1/10/5':scenario,'0/1/10/0':scenario,'0/1/6/0':scenario}};
 let requests=0;
 const fetch=async url=>{requests++;return{ok:true,json:async()=>url.endsWith('/scenarios')?paths:manifest}};
 const buttons=['12','36','60','120','all'].map(p=>Object.assign(new Element(),{dataset:{period:p}}));

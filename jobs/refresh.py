@@ -4,12 +4,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 
 from alpha_strategy.config import StrategyConfig
 from alpha_strategy.data import download_history
 from dashboard.explorer import _current_candidates
 from dashboard.store import read_snapshot, write_snapshot
+
+STRATEGY_ID = "hold-five-v1"
 
 
 def latest_close(data, symbol, date):
@@ -25,14 +28,25 @@ def latest_close(data, symbol, date):
 def refresh():
     cfg = StrategyConfig.from_yaml("config.yaml")
     previous = read_snapshot()
-    if previous is None:
-        basket = _current_candidates(cfg.use_trend_filter, cfg.require_above_ma, cfg.n_hold)
-        snapshot = {"generated_at": datetime.now(timezone.utc).isoformat(),
+    if previous is None or previous.get("strategy_id") != STRATEGY_ID:
+        basket = _current_candidates(cfg.use_trend_filter, cfg.require_above_ma, cfg.n_hold,
+                                     previous=previous.get("basket") if previous else None)
+        if previous is not None:
+            scenario_path = Path('state/scenarios.json')
+            scenarios = json.loads(scenario_path.read_text()) if scenario_path.exists() else {}
+            key = f"{int(cfg.use_trend_filter)}/{int(cfg.require_above_ma)}/{cfg.n_hold}/{cfg.risk_off_hold_count if cfg.use_trend_filter else 0}"
+            latest = scenarios.get('variants', {}).get(key, {}).get('latest')
+            if scenarios.get('strategy_id') != STRATEGY_ID or not latest or latest['date'] != basket['date']:
+                raise RuntimeError('Hold-five historical basket not ready; old forward snapshot remains unchanged')
+            basket = {**basket, 'risk_on': latest['risk_on'],
+                      'positions': latest['positions']}
+        snapshot = {"strategy_id": STRATEGY_ID,
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
                     "price_date": basket["date"], "basket": basket,
                     "forward": [{"date": basket["date"], "model_index": 100.0,
                                  "benchmark_index": 100.0, "model_return_pct": 0.0}]}
         write_snapshot(snapshot)
-        print(f"Forward model initialized at {basket['date']}; no prior performance implied")
+        print(f"New hold-five forward model initialized at {basket['date']}; earlier strategy returns excluded")
         return
 
     before = previous["basket"]
@@ -52,7 +66,7 @@ def refresh():
     for position in before["positions"]:
         close = latest_close(data, position["ticker"], date)
         values.append((position, close, position["weight"] * close / position["price"]))
-    gross = sum(v[2] for v in values) if values else 1.0
+    gross = (1.0 - sum(p["weight"] for p in before["positions"])) + sum(v[2] for v in values)
     model_return = gross - 1.0
     benchmark_close = latest_close(data, cfg.benchmark_ticker, date)
     benchmark_return = benchmark_close / before["benchmark_close"] - 1.0
@@ -64,7 +78,10 @@ def refresh():
 
     if date_string[:7] != before["date"][:7]:
         # New basket is established after this close, affecting subsequent returns.
-        basket = _current_candidates(cfg.use_trend_filter, cfg.require_above_ma, cfg.n_hold)
+        basket = _current_candidates(cfg.use_trend_filter, cfg.require_above_ma, cfg.n_hold,
+                                     previous={**before, "positions": [
+                                         {**p, "price": close, "weight": value / gross}
+                                         for p, close, value in values]})
         if basket["date"] != date_string:
             raise RuntimeError("Rebalance data dates disagree; snapshot unchanged")
     else:
@@ -72,7 +89,8 @@ def refresh():
                   "computed_at": datetime.now(timezone.utc).isoformat(),
                   "positions": [{**p, "price": close, "weight": value / gross}
                                 for p, close, value in values]}
-    snapshot = {"generated_at": datetime.now(timezone.utc).isoformat(),
+    snapshot = {"strategy_id": STRATEGY_ID,
+                "generated_at": datetime.now(timezone.utc).isoformat(),
                 "price_date": date_string, "basket": basket, "forward": forward}
     write_snapshot(snapshot)
     print(f"Forward model updated through {date_string}; {len(basket['positions'])} target holdings")

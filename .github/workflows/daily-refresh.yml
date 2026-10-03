@@ -9,6 +9,8 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/daily-refresh.yml'
+      - 'jobs/refresh.py'
+      - 'config.yaml'
 permissions:
   contents: write
 concurrency:
