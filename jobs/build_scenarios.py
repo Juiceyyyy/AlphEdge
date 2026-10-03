@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -14,6 +15,35 @@ from alpha_strategy.backtest_momentum import MomentumConfig, run_momentum_backte
 from alpha_strategy.config import StrategyConfig
 from alpha_strategy.data import download_history
 from alpha_strategy.universe import get_constituent_universe, to_yahoo_symbol
+
+MAX_HOLDINGS = 15
+STRATEGY_ID = "hold-five-v1"
+
+
+def build_fingerprint():
+    """Invalidate saved paths when the strategy implementation or parameters change."""
+    digest = hashlib.sha256()
+    for name in ("config.yaml", "alpha_strategy/backtest_momentum.py",
+                 "alpha_strategy/momentum.py", "jobs/build_scenarios.py"):
+        digest.update(Path(name).read_bytes())
+    return digest.hexdigest()
+
+
+def reusable_variants(previous, through, fingerprint):
+    if previous.get("strategy_id") != STRATEGY_ID or previous.get("data_through") != through:
+        return {}
+    variants = previous.get("variants", {})
+    if previous.get("build_fingerprint") == fingerprint:
+        return variants
+    # The previous 5–10 cache predates fingerprints. Its implementation and
+    # parameters are unchanged here; reuse those paths for this expansion only.
+    legacy_keys = {f"{int(trend)}/{int(stock)}/{count}/{retained if trend else 0}"
+                   for trend in (True, False) for stock in (True, False)
+                   for count in range(5, 11)
+                   for retained in ((0, 5) if trend else (0,))}
+    if not previous.get("build_fingerprint") and set(variants) == legacy_keys:
+        return variants
+    return {}
 
 
 def monthly_path(result):
@@ -46,11 +76,19 @@ def build(path="state/scenarios.json"):
     symbols = [to_yahoo_symbol(s) for s in universe] + [cfg.benchmark_ticker]
     data = completed_sessions(download_history(symbols, years=15,
                                                 cache_dir=cfg.data_cache_dir))
-    variants = {}
+    target = Path(path)
+    previous = json.loads(target.read_text()) if target.exists() else {}
+    through = data[cfg.benchmark_ticker].index.max().strftime("%Y-%m-%d")
+    fingerprint = build_fingerprint()
+    variants = dict(reusable_variants(previous, through, fingerprint))
+    print(f"Reusing {len(variants)} verified paths through {through}", flush=True)
     for trend in (True, False):
         for stock in (True, False):
-            for count in range(5, 11):
+            for count in range(5, MAX_HOLDINGS + 1):
                 for retained in ((0, min(5, count)) if trend else (0,)):
+                    key = f"{int(trend)}/{int(stock)}/{count}/{retained if trend else 0}"
+                    if key in variants:
+                        continue
                     mc = MomentumConfig(
                         rebalance_freq="M", n_hold=count,
                         lookback_short=cfg.lookback_short, lookback_long=cfg.lookback_long,
@@ -64,7 +102,6 @@ def build(path="state/scenarios.json"):
                         risk_off_hold_count=retained)
                     result = run_momentum_backtest(cfg, years=15, top_n=cfg.top_n_by_adtv,
                         mc=mc, verbose=False, prepared_data=data, prepared_universe=universe)
-                    key = f"{int(trend)}/{int(stock)}/{count}/{retained if trend else 0}"
                     last_signal = next((t['risk_on'] for t in reversed(result.trades)
                                         if t.get('type') == 'rebalance'), True)
                     variants[key] = {"months": monthly_path(result), "kpis": result.kpis(),
@@ -72,11 +109,11 @@ def build(path="state/scenarios.json"):
                                                 "risk_on": last_signal,
                                                 "positions": result.latest_positions}}
                     print(f"Built {key}: {len(variants[key]['months'])} monthly points", flush=True)
-    payload = {"strategy_id": "hold-five-v1", "computed_at": datetime.now(timezone.utc).isoformat(),
-               "data_through": data[cfg.benchmark_ticker].index.max().strftime("%Y-%m-%d"),
+    payload = {"strategy_id": STRATEGY_ID, "build_fingerprint": fingerprint,
+               "computed_at": datetime.now(timezone.utc).isoformat(),
+               "data_through": through,
                "method": "Historical backtests with shared market data and today's constituent universe. Selected model; not independent out-of-sample validation.",
                "variants": variants}
-    target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_suffix(target.suffix + ".tmp")
     temporary.write_text(json.dumps(payload, allow_nan=False, separators=(",", ":")) + "\n")
