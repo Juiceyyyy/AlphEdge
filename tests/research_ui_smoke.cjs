@@ -37,7 +37,7 @@ setTimeout(()=>{
  const before=requests;
  riskControls[0].querySelectorAll()[2].handlers.click();
  assert.equal(get('risk-profile').value,'aggressive');
- assert.equal(riskControls[0].style['--risk-index'],2);
+ assert.equal(riskControls[0].dataset.active,'aggressive');
  get('model-holdings').value='6';get('model-holdings').handlers.input();
  assert.equal(requests,before,'controls replay cached paths without network calls');
  assert.match(get('chart-mode').textContent,/Saved path/);
