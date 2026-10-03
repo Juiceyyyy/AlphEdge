@@ -29,7 +29,7 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: pip install -r requirements.txt
-      - name: Refresh public model snapshot
+      - name: Refresh public model snapshot after cache publication
         env:
           RESEARCH_SNAPSHOT_FILE: state/current_snapshot.json
         run: python -m jobs.refresh

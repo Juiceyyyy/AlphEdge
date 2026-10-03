@@ -33,6 +33,8 @@ jobs:
       - name: Build daily target baskets
         run: python -m jobs.build_holdings
       - name: Migrate forward snapshot to new strategy when required
+        env:
+          RESEARCH_SNAPSHOT_FILE: state/current_snapshot.json
         run: python -m jobs.refresh
       - name: Update static fallbacks
         run: |
