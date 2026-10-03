@@ -29,6 +29,7 @@ class MomentumConfig:
     """Tuneable knobs for the momentum strategy."""
     rebalance_freq: str = "M"           # 'M' = monthly, 'W-MON' = weekly, 'D' = daily check
     n_hold: int = 10                    # number of stocks held when fully invested
+    risk_off_hold_count: int = 5       # strongest existing holdings kept below Nifty MA
     lookback_short: int = 126           # ~6 months
     lookback_long: int = 252            # ~12 months
     momentum_skip: int = 21             # ~1 month skip
@@ -106,6 +107,7 @@ class MomentumResult:
     trades: list[dict[str, Any]]
     holdings_history: list[dict[str, Any]]
     config: dict[str, Any]
+    latest_positions: list[dict[str, Any]] = field(default_factory=list)
 
     def kpis(self) -> dict[str, Any]:
         eq = self.equity_curve.dropna()
@@ -213,6 +215,7 @@ def run_momentum_backtest(cfg: StrategyConfig,
     cash = float(cfg.starting_capital)
     holdings: dict[str, dict[str, float]] = {}    # ticker -> {qty, avg_price}
     pending_rebalance: dict[str, float] | None = None
+    pending_hold_only = False
     trades: list[dict[str, Any]] = []
     holdings_history: list[dict[str, Any]] = []
     equity_curve: list[tuple[pd.Timestamp, float]] = []
@@ -237,7 +240,9 @@ def run_momentum_backtest(cfg: StrategyConfig,
         # Step 1: execute pending rebalance at TODAY's open
         if pending_rebalance is not None:
             target_weights = pending_rebalance
+            hold_only = pending_hold_only
             pending_rebalance = None
+            pending_hold_only = False
             # Compute equity using today's open for everything we hold
             equity = cash
             for sym, h in holdings.items():
@@ -273,6 +278,8 @@ def run_momentum_backtest(cfg: StrategyConfig,
             # Adjust positions to target value (sell partials before buys to free cash)
             adjustments = []
             for sym, tv in target_value.items():
+                if hold_only and sym in holdings:
+                    continue  # do not resize retained shares in risk-off months
                 df = raw.get(sym)
                 if df is None or dt not in df.index:
                     continue
@@ -339,7 +346,7 @@ def run_momentum_backtest(cfg: StrategyConfig,
             risk_on = (not mc.use_trend_filter or
                        benchmark_in_uptrend(bench_close, dt, mc.trend_filter_window))
 
-            if risk_on:
+            if risk_on or mc.risk_off_hold_count > 0:
                 # Build price_data subset = current universe up to today
                 pd_for_rank: dict[str, pd.DataFrame] = {}
                 for sym in current_universe:
@@ -357,11 +364,31 @@ def run_momentum_backtest(cfg: StrategyConfig,
                     long_ma_window=mc.long_ma_window,
                     vol_window=mc.vol_window,
                     min_score=mc.min_momentum,
-                    require_above_ma=mc.require_above_ma,
+                    require_above_ma=mc.require_above_ma if risk_on else False,
                 )
 
+                if not risk_on:
+                    # Sell weaker existing positions. Keep shares/weights of survivors;
+                    # never buy a new name or reinvest cash while the filter is off.
+                    scores = {p.ticker: p.score for p in picks}
+                    ranked_held = sorted(holdings,
+                        key=lambda sym: (-scores.get(sym, float('-inf')), sym))
+                    keep = set(ranked_held[:min(mc.risk_off_hold_count, mc.n_hold)])
+                    equity_now = cash
+                    values = {}
+                    for sym, h in holdings.items():
+                        df = raw.get(sym)
+                        price = (float(df.loc[dt, 'Close']) if df is not None and dt in df.index
+                                 else h['avg_price'])
+                        values[sym] = h['qty'] * price
+                        equity_now += values[sym]
+                    target_weights = {sym: values[sym] / equity_now for sym in keep}
+                    continue_risk_off = True
+                else:
+                    continue_risk_off = False
+
                 # Apply hysteresis: hold while in top-(n_hold + replacement_band)
-                if mc.replacement_band > 0 and holdings:
+                if not continue_risk_off and mc.replacement_band > 0 and holdings:
                     eligible = picks[: mc.n_hold + mc.replacement_band]
                     eligible_syms = {p.ticker for p in eligible}
                     # Build target list: kept holdings + top non-held to fill remaining slots
@@ -377,12 +404,12 @@ def run_momentum_backtest(cfg: StrategyConfig,
                     target_weights = _target_weights(
                         target_picks, mc.n_hold, mc.weighting, mc.target_total_exposure
                     )
-                else:
+                elif not continue_risk_off:
                     target_weights = _target_weights(picks, mc.n_hold,
                                                       mc.weighting, mc.target_total_exposure)
 
                 # Optional weight-drift gate: skip rebalance if drift below threshold
-                if (mc.weight_drift_threshold > 0 and target_weights and holdings):
+                if (risk_on and mc.weight_drift_threshold > 0 and target_weights and holdings):
                     eq_now = cash
                     for sym, h in holdings.items():
                         df = raw.get(sym)
@@ -402,10 +429,11 @@ def run_momentum_backtest(cfg: StrategyConfig,
                     if same_set and drift < mc.weight_drift_threshold:
                         target_weights = None  # skip
             else:
-                target_weights = {}   # cash
+                target_weights = {}   # explicit zero-retention variant
 
             if target_weights is not None:
                 pending_rebalance = target_weights
+                pending_hold_only = not risk_on
                 trades.append({
                     "type": "rebalance", "date": dt.strftime("%Y-%m-%d"),
                     "risk_on": risk_on, "n_targets": len(target_weights),
@@ -439,7 +467,22 @@ def run_momentum_backtest(cfg: StrategyConfig,
         if not bench_curve.empty:
             bench_curve = bench_curve / bench_curve.iloc[0] * cfg.starting_capital
 
+    latest_positions = []
+    last_date = eq.index[-1]
+    last_equity = float(eq.iloc[-1])
+    for sym, h in holdings.items():
+        df = raw.get(sym)
+        price = float(df.loc[last_date, 'Close']) if df is not None and last_date in df.index else h['avg_price']
+        latest_positions.append({'ticker': sym, 'weight': h['qty'] * price / last_equity,
+                                 'price': price})
+    if pending_rebalance is not None:
+        # The last close may have generated next-session targets. Publish that
+        # decision, not the portfolio just before the pending rebalance.
+        latest_positions = [{'ticker': sym, 'weight': weight,
+                             'price': float(raw[sym].loc[last_date, 'Close'])}
+                            for sym, weight in pending_rebalance.items()]
     return MomentumResult(
+        latest_positions=latest_positions,
         equity_curve=eq, benchmark_curve=bench_curve,
         trades=trades, holdings_history=holdings_history,
         config={**cfg.to_dict(), **{f"momentum_{k}": v for k, v in mc.__dict__.items()}},

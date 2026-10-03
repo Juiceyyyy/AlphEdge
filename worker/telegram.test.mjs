@@ -11,7 +11,7 @@ const forward = [
 const fixtures = (risk_on = false) => ({
   snap: {price_date: '2026-03-02', forward},
   baskets: {baskets: {
-    '1/1/10': {date: '2026-03-02', risk_on,
+    '1/1/10/5': {date: '2026-03-02', risk_on,
       positions: risk_on ? [{ticker: 'ABC.NS', weight: 1}] : []},
     '0/1/15': {positions: [{ticker: 'ABC.NS', momentum: .42}]},
   }},
@@ -56,16 +56,16 @@ test('cash model has readable sections, a small index chart, and no buy instruct
   const {message, target} = buildReport({joined_date: '2026-02-01',
     capital: 10000, sip: 1000, kpis: true}, snap, baskets);
   assert.match(message, /100%/);
-  assert.match(message, /<b>06  UNDERLYING STOCK RANKING<\/b>/);
+  assert.match(message, /<b>05  SINCE YOU STARTED/);
   assert.match(message, /NIFTY 50/);
   assert.match(message, /RECENT INDEX PATH/);
-  assert.match(message, /not buy instructions/);
+  assert.match(message, /retains|Keep up to/);
   assert.deepEqual(target.positions, {});
 });
 
 test('equity rows escape ticker text before Telegram HTML parsing', () => {
   const {snap, baskets} = fixtures(true);
-  baskets.baskets['1/1/10'].positions[0].ticker = 'A&B.NS';
+  baskets.baskets['1/1/10/5'].positions[0].ticker = 'A&B.NS';
   const {message} = buildReport({joined_date: '2026-02-01',
     capital: 10000, sip: 0, kpis: false}, snap, baskets);
   assert.match(message, /A&amp;B/);
@@ -85,8 +85,8 @@ test('new user completes amount, SIP, and paper-tracking onboarding', async () =
     assert.match((await bot.command('/start')).text, /INITIAL AMOUNT/);
     assert.equal(bot.sent.at(-1).parse_mode, 'HTML');
     assert.match((await bot.command('5000')).text, /MONTHLY SIP/);
-    assert.match((await bot.command('500')).text, /WHEN TO BEGIN/);
-    assert.match((await bot.command('yes')).text, /PAPER TRACKING STARTED/);
+    assert.match((await bot.command('500')).text, /CHOOSE YOUR TRACKING/);
+    assert.match((await bot.command('3')).text, /PAPER TRACKING STARTED/);
     const saved = JSON.parse(bot.store.get('sub:123'));
     assert.deepEqual([saved.capital, saved.sip, saved.mode, saved.status, saved.joined_date],
       [5000, 500, 'paper', 'active', '2026-10-03']);
@@ -100,13 +100,13 @@ test('waiting user receives no scheduled alert, then start activates tracking', 
     await bot.command('/start');
     assert.match((await bot.command('0')).text, /above zero/);
     await bot.command('10000'); await bot.command('0');
-    assert.match((await bot.command('later')).text, /No reports are sent while waiting/);
+    assert.match((await bot.command('2')).text, /No reports are sent while waiting/);
     const sentBefore = bot.sent.length;
     await bot.env.SUBSCRIBERS.list();
     // A scheduled call is safe even when snapshot fetch fails; waiting is never active.
     assert.equal(JSON.parse(bot.store.get('sub:123')).status, 'waiting');
     assert.equal(bot.sent.length, sentBefore);
-    assert.match((await bot.command('start')).text, /TRACKING STARTED/);
+    assert.match((await bot.command('1')).text, /TRACKING STARTED/);
     assert.equal(JSON.parse(bot.store.get('sub:123')).mode, 'live');
     await bot.command('/stop');
     assert.equal(bot.store.has('sub:123'), false);
@@ -120,4 +120,32 @@ test('existing active subscribers retain their original start date', async () =>
     assert.match((await bot.command('/start')).text, /WELCOME BACK/);
     assert.equal(JSON.parse(bot.store.get('sub:123')).joined_date, '2026-10-01');
   } finally { bot.restore(); }
+});
+
+test('onboarding buttons choose paper mode without requiring an ambiguous yes', async () => {
+  const bot = mockBot();
+  try {
+    await bot.command('/start'); await bot.command('10000');
+    const prompt = await bot.command('1000');
+    assert.equal(prompt.reply_markup.inline_keyboard[1][0].text, 'Paper tracking');
+    const response = await worker.fetch(new Request('https://bot.example/telegram', {
+      method: 'POST', headers: {'X-Telegram-Bot-Api-Secret-Token': 'secret'},
+      body: JSON.stringify({callback_query: {id: 'callback1', data: 'begin:paper',
+        from: {id: 123}, message: {chat: {type: 'private', id: 123}}}}),
+    }), bot.env);
+    assert.equal(response.status, 200);
+    assert.equal(JSON.parse(bot.store.get('sub:123')).mode, 'paper');
+  } finally { bot.restore(); }
+});
+
+test('custom model targets are selected without attributing default forward KPIs', () => {
+  const {snap, baskets} = fixtures();
+  baskets.baskets['1/1/8/3'] = {date: '2026-03-02', risk_on: false,
+    positions: [{ticker: 'ABC.NS', weight: .36}]};
+  const {message} = buildReport({joined_date: '2026-02-01', capital: 10000,
+    sip: 1000, kpis: true, holdings: 8, retain: 3}, snap, baskets);
+  assert.match(message, /8-stock monthly model/);
+  assert.match(message, /36%/);
+  assert.match(message, /only for the published default model/);
+  assert.doesNotMatch(message, /Model P\/L/);
 });

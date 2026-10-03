@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // Free Cloudflare Worker: private onboarding, instant commands, scheduled research alerts.
 const SOURCE = 'https://raw.githubusercontent.com/Juiceyyyy/AlphEdge/main/state/';
-const HELP = `<b>ALPHEDGE  /  RESEARCH BOT</b>\n\n/start — Set up or resume tracking\n/now — Latest model report\n/settings — Your assumptions and tracking mode\n/capital 10000 — Initial amount (₹)\n/sip 5000 — Monthly amount (₹)\n/kpis on|off — Toggle performance section\n/help — Commands\n/stop — Delete your subscription\n\n<i>Research model only. No broker access or orders.</i>`;
+const HELP = `<b>ALPHEDGE  /  RESEARCH BOT</b>\n\n/start — Set up or resume tracking\n/now — Latest model report\n/settings — Your assumptions and tracking mode\n/capital 10000 — Initial amount (₹)\n/sip 5000 — Monthly amount (₹)\n/holdings 10 — Risk-on holdings (5–10)\n/retain 5 — Existing holdings kept risk-off (0–N)\n/trend on|off — Nifty 200-day filter\n/stock on|off — Stock 200-day filter\n/kpis on|off — Toggle performance section\n/help — Commands\n/stop — Delete your subscription\n\n<i>Research model only. No broker access or orders.</i>`;
 const amount = n => `${n < 0 ? '-' : ''}₹${Math.abs(n).toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
 const pct = n => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
 const escape = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -31,10 +31,10 @@ async function telegram(env, method, data) {
   if (!json.ok) throw new Error(`Telegram ${method} returned an error`);
   return json.result;
 }
-async function send(env, id, message) {
+async function send(env, id, message, reply_markup) {
   if (message.length > 4096) throw new Error('Message exceeds Telegram limit');
   await telegram(env, 'sendMessage', {chat_id: id, text: message, parse_mode: 'HTML',
-    disable_web_page_preview: true});
+    disable_web_page_preview: true, ...(reply_markup ? {reply_markup} : {})});
 }
 async function marketData() {
   const [snap, baskets] = await Promise.all(['current_snapshot.json', 'holdings_cache.json']
@@ -46,7 +46,8 @@ async function marketData() {
   const day = snap.price_date;
   const age = (Date.now() - Date.parse(`${day}T00:00:00Z`)) / 86400000;
   if (baskets.price_date !== day || age < 0 || age > 6 ||
-      snap.forward?.at(-1)?.date !== day || baskets.baskets?.['1/1/10']?.date !== day) {
+      snap.forward?.at(-1)?.date !== day || baskets.strategy_id !== "hold-five-v1" || snap.strategy_id !== "hold-five-v1" ||
+      baskets.baskets?.['1/1/10/5']?.date !== day) {
     throw new Error('Research data stale or mismatched');
   }
   return {snap, baskets};
@@ -77,9 +78,13 @@ export function subscriberPerformance(sub, forward) {
     dd: dd * 100, niftyDd: niftyDd * 100};
 }
 
+const modelSettings = sub => ({count: sub.holdings ?? 10, retain: sub.retain ?? 5,
+  trend: sub.trend ?? true, stock: sub.stock ?? true});
+const modelKey = sub => {const m = modelSettings(sub);return `${Number(m.trend)}/${Number(m.stock)}/${m.count}/${m.trend ? Math.min(m.retain, m.count) : 0}`;};
 export function buildReport(sub, snap, baskets) {
-  const target = baskets.baskets['1/1/10'];
-  const ranking = baskets.baskets['0/1/15'].positions;
+  const model = modelSettings(sub);
+  const target = baskets.baskets[modelKey(sub)];
+  if (!target) throw new Error('Selected model basket is unavailable');
   const current = Object.fromEntries(target.positions.map(p => [p.ticker, p.weight]));
   const previous = sub.last_target;
   const old = previous?.positions ?? {};
@@ -90,9 +95,9 @@ export function buildReport(sub, snap, baskets) {
     `${String(i + 1).padStart(2)} ${escape(symbol(p.ticker)).padEnd(15)} ${String((p.weight * 100).toFixed(1) + '%').padStart(6)}`);
   const lines = [
     '<b>ALPHEDGE  /  MODEL REVIEW</b>',
-    `<i>Close ${escape(snap.price_date)} · 10-stock monthly model</i>`, '',
+    `<i>Close ${escape(snap.price_date)} · ${model.count}-stock monthly model · keep ${model.retain} in risk-off</i>`, '',
     '<b>01  MARKET STATE</b>',
-    `<b>${target.risk_on ? 'RISK ON' : 'RISK OFF'}</b>  ·  Nifty 200-day filter`,
+    `<b>${model.trend ? (target.risk_on ? 'RISK ON' : 'RISK OFF') : 'NIFTY FILTER OFF'}</b>  ·  Nifty 200-day filter`,
     `Equity  ${bar(equity)} ${(equity * 100).toFixed(0)}%`,
     `Cash    ${bar(1 - equity)} ${((1 - equity) * 100).toFixed(0)}%`, '',
     '<b>02  TARGET HOLDINGS</b>',
@@ -104,11 +109,11 @@ export function buildReport(sub, snap, baskets) {
       : ['First report; no earlier target to compare.']),
     '', '<b>04  MODEL NOTE</b>',
     target.risk_on ? 'Review target weights for the next interval.' :
-      'Default model targets cash until the trend filter clears.',
+      `Keep up to ${model.retain} strongest existing positions; the remaining allocation stays cash until risk-on.`,
     '<i>Compare with your own holdings; no orders or share quantities are generated.</i>',
   ];
   if (sub.kpis) {
-    const p = subscriberPerformance(sub, snap.forward);
+    const p = modelKey(sub) === '1/1/10/5' ? subscriberPerformance(sub, snap.forward) : null;
     lines.push('', '<b>05  SINCE YOU STARTED · HYPOTHETICAL</b>');
     if (p) {
       lines.push(`Since ${p.since} · contributed ${amount(p.paid)}`,
@@ -119,14 +124,10 @@ export function buildReport(sub, snap, baskets) {
       const path = snap.forward.filter(r => r.date >= p.since);
       if (path.length >= 2) lines.push('<b>RECENT INDEX PATH</b> <i>(last 24 closes; independent scales, excludes SIP)</i>',
         `<pre>Model  ${sparkline(path, 'model_index')}\nNifty  ${sparkline(path, 'benchmark_index')}</pre>`);
-    } else lines.push('Starts after the next completed market close.');
+    } else lines.push(modelKey(sub) === '1/1/10/5' ? 'Starts after the next completed market close.' : 'Forward subscriber KPIs are available only for the published default model. Custom model targets have separate historical simulations, not a daily subscribed series.');
     lines.push(`<i>${amount(sub.capital)} initial + ${amount(sub.sip)}/month; excludes fees, taxes and execution.</i>`);
   }
-  lines.push('', '<b>06  UNDERLYING STOCK RANKING</b>',
-    '<i>Top 15 momentum signals; rankings are not buy instructions.</i>',
-    `<pre>${ranking.map((p, i) =>
-      `${String(i + 1).padStart(2)} ${escape(symbol(p.ticker)).padEnd(15)} ${p.momentum >= 0 ? '+' : ''}${p.momentum.toFixed(2)}`).join('\n')}</pre>`,
-    '<i>Research only · hypothetical index values, not broker returns · Nifty price index excludes dividends.</i>');
+  lines.push('', '<i>Research only · hypothetical model, not broker returns · Nifty price index excludes dividends.</i>');
   const message = lines.join('\n');
   if (message.length > 4096) throw new Error('Report too long');
   return {message, target: {date: snap.price_date, positions: current, risk_on: target.risk_on}};
@@ -136,24 +137,36 @@ const settings = sub => `<b>ALPHEDGE  /  YOUR SETTINGS</b>\n` +
   `Tracking: <b>${active(sub) ? (sub.mode === 'paper' ? 'paper research' : 'live assumption') : 'waiting to start'}</b>\n` +
   `Start: ${sub.joined_date ?? 'not started'}\n` +
   `Initial amount: ${amount(sub.capital)}\nMonthly SIP: ${amount(sub.sip)}\n` +
+  `Model: ${modelSettings(sub).count} stocks · keep ${modelSettings(sub).retain} when risk-off\n` +
+  `Filters: Nifty ${modelSettings(sub).trend ? 'on' : 'off'} · stock ${modelSettings(sub).stock ? 'on' : 'off'}\n` +
   `Performance KPIs: ${sub.kpis ? 'on' : 'off'}\n` +
-  '<i>Published 10-stock forward research index; not your actual account.</i>';
+  '<i>Forward KPIs cover only the default 10-stock / keep-five model; not your actual account.</i>';
 const question = stage => stage === 'capital'
   ? '<b>01 / 03 · INITIAL AMOUNT</b>\nWhat amount would you like to track initially? Reply with whole rupees, for example <code>10000</code>.'
   : stage === 'sip'
     ? '<b>02 / 03 · MONTHLY SIP</b>\nHow much will you add each month? Reply with whole rupees, or <code>0</code> for no SIP.'
     : stage === 'intent'
-      ? '<b>03 / 03 · WHEN TO BEGIN</b>\nReply <code>start</code> if you are starting now, or <code>later</code> if you are not investing yet. You can track a paper scenario instead by replying <code>yes</code>.'
-      : '<b>SETUP SAVED</b>\nReply <code>start</code> when you begin investing, or <code>yes</code> to track a paper scenario from today. No reports are sent while waiting.';
+      ? '<b>03 / 03 · CHOOSE YOUR TRACKING</b>\nWill you follow the model with your own investments, or explore it on paper?\n\n<b>Start now</b> — track a hypothetical comparison from your start date.\n<b>Start later</b> — save settings and wait.\n<b>Paper tracking</b> — follow from today without investing.\n\nTap an option below or reply <code>1</code>, <code>2</code>, or <code>3</code>.'
+      : '<b>SETUP SAVED</b>\nSend /start when you begin investing, or reply <code>paper</code> to follow the model without investing. No reports are sent while waiting.';
 function parseAmount(value, allowZero) {
   const clean = value.replace(/,/g, '');
   const n = /^\d+$/.test(clean) ? Number(clean) : NaN;
   return Number.isSafeInteger(n) && n <= 100000000 && (allowZero || n > 0) ? n : null;
 }
+const beginButtons = {inline_keyboard: [[{text: 'Start now', callback_data: 'begin:live'},
+  {text: 'Start later', callback_data: 'begin:later'}],
+  [{text: 'Paper tracking', callback_data: 'begin:paper'}]]};
 async function save(env, id, sub) { await env.SUBSCRIBERS.put(key(id), JSON.stringify(sub)); }
 
 async function handle(update, env) {
-  const msg = update.message;
+  const callback = update.callback_query;
+  if (callback) {
+    if (callback.message?.chat?.type !== 'private' ||
+        callback.from?.id !== callback.message.chat.id) return;
+    await telegram(env, 'answerCallbackQuery', {callback_query_id: callback.id});
+  }
+  const msg = callback ? {...callback.message, text: ({'begin:live': '1',
+    'begin:later': '2', 'begin:paper': '3'})[callback.data], date: Math.floor(Date.now()/1000)} : update.message;
   if (msg?.chat?.type !== 'private' || typeof msg.text !== 'string') return;
   const id = String(msg.chat.id);
   const [rawCommand, ...parts] = msg.text.trim().split(/\s+/);
@@ -174,7 +187,7 @@ async function handle(update, env) {
     } else if (stored && active(stored)) {
       await send(env, id, `<b>WELCOME BACK</b>\n${settings(stored)}\n\nUse /now for the latest model review.`);
     } else if (stored) {
-      await send(env, id, question(stored.stage));
+      await send(env, id, question(stored.stage), stored.stage === 'intent' ? beginButtons : undefined);
     } else {
       await save(env, id, {stage: 'capital', status: 'setup', kpis: true});
       await send(env, id, `<b>WELCOME TO ALPHEDGE</b>\n<i>Follow the published Indian equity research model against the Nifty 50. No broker connection is required.</i>\n\n${question('capital')}`);
@@ -184,7 +197,7 @@ async function handle(update, env) {
   if (command === '/help') { await send(env, id, HELP); return; }
   if (!stored) { await send(env, id, 'Send /start to set up your private research tracker.'); return; }
   if (command === '/settings') {
-    await send(env, id, stored.stage && stored.stage !== 'waiting' ? question(stored.stage) : settings(stored));
+    await send(env, id, stored.stage && stored.stage !== 'waiting' ? question(stored.stage) : settings(stored), stored.stage === 'intent' ? beginButtons : undefined);
     return;
   }
   if (stored.stage === 'capital' || stored.stage === 'sip') {
@@ -193,20 +206,39 @@ async function handle(update, env) {
     if (n === null) { await send(env, id, `Enter a whole rupee amount ${field === 'capital' ? 'above zero' : 'of zero or more'}, up to ₹10,00,00,000.`); return; }
     stored[field] = n; stored.stage = field === 'capital' ? 'sip' : 'intent';
     await save(env, id, stored);
-    await send(env, id, question(stored.stage));
+    await send(env, id, question(stored.stage), stored.stage === 'intent' ? beginButtons : undefined);
     return;
   }
   if (stored.stage === 'intent' || stored.stage === 'waiting') {
-    if (command === 'start' || command === 'yes') {
-      stored.stage = null; stored.status = 'active'; stored.mode = command === 'yes' ? 'paper' : 'live';
+    if (['start', '1', 'paper', '3'].includes(command)) {
+      stored.stage = null; stored.status = 'active'; stored.mode = ['paper', '3'].includes(command) ? 'paper' : 'live';
       stored.joined_date = dateInIndia(msg.date);
       await save(env, id, stored);
       await send(env, id, `<b>${stored.mode === 'paper' ? 'PAPER TRACKING STARTED' : 'TRACKING STARTED'}</b>\n${settings(stored)}\n\nUse /now for the latest model report. Forward KPIs begin after the next completed close.`);
-    } else if (command === 'later') {
+    } else if (['later', '2'].includes(command)) {
       stored.stage = 'waiting'; stored.status = 'waiting';
       await save(env, id, stored);
       await send(env, id, question('waiting'));
-    } else await send(env, id, question(stored.stage));
+    } else await send(env, id, question(stored.stage), stored.stage === 'intent' ? beginButtons : undefined);
+    return;
+  }
+  if (command === '/holdings' || command === '/retain') {
+    const n = parseAmount(value, command === '/retain');
+    const max = command === '/holdings' ? 10 : modelSettings(stored).count;
+    const min = command === '/holdings' ? 5 : 0;
+    if (n === null || n < min || n > max) {
+      await send(env, id, `Choose a number from ${min} to ${max} for ${command}.`); return;
+    }
+    stored[command.slice(1)] = n;
+    if (stored.retain > stored.holdings) stored.retain = stored.holdings;
+    stored.last_target = null;
+    await save(env, id, stored); await send(env, id, settings(stored));
+    return;
+  }
+  if ((command === '/trend' || command === '/stock') && ['on', 'off'].includes(value.toLowerCase())) {
+    stored[command.slice(1)] = value.toLowerCase() === 'on';
+    stored.last_target = null;
+    await save(env, id, stored); await send(env, id, settings(stored));
     return;
   }
   if (command === '/kpis' && ['on', 'off'].includes(value.toLowerCase())) {
@@ -240,7 +272,8 @@ async function scheduledReport(env) {
       const sub = await env.SUBSCRIBERS.get(item.name, 'json');
       if (!active(sub)) continue;
       const old = sub.last_target;
-      const now = data.baskets.baskets['1/1/10'];
+      const now = data.baskets.baskets[modelKey(sub)];
+      if (!now) continue;
       if (old?.date?.slice(0, 7) === data.snap.price_date.slice(0, 7) &&
           old.risk_on === now.risk_on) continue;
       const id = item.name.slice(4);
@@ -276,7 +309,7 @@ export default {
         request.headers.get('X-Setup-Key') === env.WEBHOOK_SECRET) {
       const result = await telegram(env, 'setWebhook', {
         url: `${url.origin}/telegram`, secret_token: env.WEBHOOK_SECRET,
-        allowed_updates: ['message'], drop_pending_updates: false,
+        allowed_updates: ['message', 'callback_query'], drop_pending_updates: false,
       });
       return Response.json({webhook_set: result === true});
     }

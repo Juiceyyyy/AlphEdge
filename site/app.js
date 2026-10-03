@@ -44,9 +44,10 @@
     });
   }
 
-  const key = (a,b,c) => `${Number(a)}/${Number(b)}/${Number(c)}`;
-  const chartKey = () => key($('trend').checked,$('stock').checked,$('holdings').value);
-  const basketKey = () => key($('model-trend').checked,$('model-stock').checked,$('model-holdings').value);
+  const key = (a,b,c,d) => `${Number(a)}/${Number(b)}/${Number(c)}/${a?Math.min(Number(c),Number(d)):0}`;
+  function clampRetain(prefix){const count=Number($(prefix+'holdings').value),slider=$(prefix+'retain');slider.max=String(count);if(Number(slider.value)>count)slider.value=String(count);set(prefix+'retain-value',`${slider.value} of ${count} stocks`);}
+  const chartKey = () => key($('trend').checked,$('stock').checked,$('holdings').value,$('retain').value);
+  const basketKey = () => key($('model-trend').checked,$('model-stock').checked,$('model-holdings').value,$('model-retain').value);
   let manifest=null, scenarios=null, activePeriod='120';
   const svgNS='http://www.w3.org/2000/svg';
   const node=(parent,tag,attrs,label)=>{const el=document.createElementNS(svgNS,tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));if(label!==undefined)el.textContent=label;parent.append(el);return el;};
@@ -61,11 +62,11 @@
   }
   function tables(){
     const research=manifest?.research?.variants?.[chartKey()];
-    const yearly=research?.annual || manifest?.backtest?.yearly || [];
+    const yearly=research?.annual || [];
     comparisonTable($('annual-results'),yearly.map(x=>({cells:[`${x.year}${x.active?' · YTD':''}`,pct(x.return_pct),pct(x.bench_return_pct)],strategy:Number(x.return_pct),benchmark:Number(x.bench_return_pct)})));
-    const windows=research?.windows || manifest?.windows || [];
+    const windows=research?.windows || [];
     const active=research?.active_window;
-    const rolling=research ? [...windows, ...(active?[active]:[])] : manifest?.rolling_windows || [];
+    const rolling=[...windows, ...(active?[active]:[])];
     const format=x=>({cells:[x.label || `${x.start} – ${x.end}`,pct(x.cagr_pct),pct(x.bench_cagr_pct),pct(x.max_dd_pct)],strategy:Number(x.cagr_pct),benchmark:Number(x.bench_cagr_pct)});
     comparisonTable($('window-results'),windows.filter((_,i)=>i%3===0).map(format));
     comparisonTable($('rolling-results'),rolling.map(format));
@@ -74,13 +75,15 @@
   }
   function renderBasket(){
     if(!manifest)return;
-    set('model-holdings-value',`${$('model-holdings').value} stocks`);
+    clampRetain('model-');set('model-holdings-value',`${$('model-holdings').value} stocks`);
     const cached=manifest.holdings?.baskets?.[basketKey()];
-    const basket=cached || (basketKey()==='1/1/10'?manifest.snapshot?.basket:null);
+    const basket=cached || (basketKey()==='1/1/10/5'?manifest.snapshot?.basket:null);
     const list=$('candidate-positions');list.replaceChildren();
     if(!basket){set('candidate-status','Saved model basket is awaiting the next daily refresh.');return;}
-    set('candidate-status',`Prices through ${basket.date} · ${basket.risk_on?'Invested model':'Cash allocation'} · saved daily`);
-    if(!basket.positions.length){const div=document.createElement('div');div.className='empty-state';div.textContent=basket.risk_on?'No eligible names on this price date.':'Nifty trend filter indicates 100% cash.';list.append(div);return;}
+    set('candidate-status',`Prices through ${basket.date} · ${basket.risk_on?'Invested model':'Retained holdings + cash'} · saved daily`);
+    if(!basket.positions.length){const div=document.createElement('div');div.className='empty-state';div.textContent=basket.risk_on?'No eligible names on this price date.':'No existing holdings retained under this setting; target is cash.';list.append(div);return;}
+    const allocated=basket.positions.reduce((sum,p)=>sum+p.weight,0);
+    if(!basket.risk_on)set('candidate-status',`Prices through ${basket.date} · ${(allocated*100).toFixed(1)}% retained stocks · ${((1-allocated)*100).toFixed(1)}% cash`);
     basket.positions.forEach(p=>{const row=document.createElement('div');row.className='position';const info=document.createElement('div');const name=document.createElement('strong');name.textContent=p.ticker.replace('.NS','');const note=document.createElement('small');note.textContent='Target allocation';info.append(name,note);const weight=document.createElement('span');weight.className='weight';weight.textContent=`${(p.weight*100).toFixed(1)}%`;row.append(info,weight);list.append(row);});
   }
   function periodRows(months){
@@ -124,7 +127,7 @@
     svg.setAttribute('aria-label',`Strategy and Nifty from ${rows[0].date} through ${rows.at(-1).date}`);
   }
   function renderBacktest(){
-    set('lump-value',money($('lump').value));set('sip-value',money($('sip').value));set('holdings-value',`${$('holdings').value} stocks`);
+    set('lump-value',money($('lump').value));set('sip-value',money($('sip').value));set('holdings-value',`${$('holdings').value} stocks`);clampRetain('');
     if(!manifest)return;
     const variant=scenarios?.variants?.[chartKey()];
     if(!variant){set('chart-mode','Loading cached history');inform('Loading the saved research paths…');return;}
@@ -149,7 +152,7 @@
   function forward(){
     if(!manifest)return;
     const recorded=manifest.snapshot?.forward||[];
-    const history=scenarios?.variants?.['1/1/10']?.months?.filter(m=>m.date.slice(0,4)==='2026')||[];
+    const history=scenarios?.variants?.['1/1/10/5']?.months?.filter(m=>m.date.slice(0,4)==='2026')||[];
     let a=100,b=100;
     const reconstructed=history.length?[{date:'2026-01-01',model_index:100,benchmark_index:100},...history.map(m=>{a*=1+m.strategy_return;b*=1+m.benchmark_return;return{date:m.date,model_index:a,benchmark_index:b};})]:[];
     // Never splice distinct retrospectively calculated and daily observed series.
@@ -159,11 +162,11 @@
     chart(use,'forward-chart',null,true);
     $('forward-chart').setAttribute('aria-label',reconstructed.length?'Retrospective 2026 backtest path from January':'Recorded daily model from first public snapshot');
   }
-  ['lump','sip','trend','stock','holdings'].forEach(id=>{
+  ['lump','sip','trend','stock','holdings','retain'].forEach(id=>{
     $(id).addEventListener('input',renderBacktest);
     $(id).addEventListener('change',()=>{revealedCharts.delete('growth-chart');renderBacktest();});
   });
-  ['model-trend','model-stock','model-holdings'].forEach(id=>$(id).addEventListener('input',renderBasket));
+  ['model-trend','model-stock','model-holdings','model-retain'].forEach(id=>$(id).addEventListener('input',renderBasket));
   document.querySelectorAll('[data-period]').forEach(button=>button.addEventListener('click',()=>{activePeriod=button.dataset.period;revealedCharts.delete('growth-chart');document.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b===button));renderBacktest();}));
   ['start-month','end-month'].forEach(id=>$(id).addEventListener('input',()=>{activePeriod='custom';revealedCharts.delete('growth-chart');document.querySelectorAll('[data-period]').forEach(b=>b.classList.remove('active'));renderBacktest();}));
   async function staticJson(name) {
@@ -177,20 +180,18 @@
   async function load(){
     try{
       if(window.ALPHEDGE_STATIC){
-        const [snapshot,research,holdings,paths,baseline,wf]=await Promise.all([
+        const [snapshot,research,holdings,paths]=await Promise.all([
           staticJson('current_snapshot.json'),staticJson('research_cache.json'),
-          staticJson('holdings_cache.json'),staticJson('scenarios.json'),
-          staticJson('winner_max_sharpe.json'),staticJson('walk_forward.json')]);
-        manifest={snapshot,research,holdings,backtest:baseline,
-          windows:wf.windows_3y||[],rolling_windows:wf.rolling_3y_step_6m||[]};
+          staticJson('holdings_cache.json'),staticJson('scenarios.json')]);
+        manifest={snapshot,research,holdings};
         scenarios=paths;
       }else{
         const [overview,paths]=await Promise.all([fetch('/api/explore',{cache:'no-store'}),fetch('/api/explore/scenarios')]);
         if(!overview.ok||!paths.ok)throw Error('Saved data could not be fetched');
         manifest=await overview.json();scenarios=await paths.json();
       }
-      if(!scenarios?.variants?.['1/1/10'])throw Error('The historical cache is temporarily unavailable');
-      const months=scenarios.variants['1/1/10'].months;
+      if(scenarios?.strategy_id!=='hold-five-v1'||manifest?.research?.strategy_id!=='hold-five-v1'||manifest?.holdings?.strategy_id!=='hold-five-v1'||manifest?.snapshot?.strategy_id!=='hold-five-v1'||!scenarios?.variants?.['1/1/10/5'])throw Error('The hold-five research cache is being rebuilt; try again after the next refresh');
+      const months=scenarios.variants['1/1/10/5'].months;
       $('start-month').min=months[0].date.slice(0,7);$('start-month').max=months.at(-1).date.slice(0,7);
       $('end-month').min=months[0].date.slice(0,7);$('end-month').max=months.at(-1).date.slice(0,7);
       if(!$('start-month').value)$('start-month').value=months[0].date.slice(0,7);

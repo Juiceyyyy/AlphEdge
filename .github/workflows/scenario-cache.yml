@@ -32,8 +32,11 @@ jobs:
         run: python -m jobs.build_research_cache
       - name: Build daily target baskets
         run: python -m jobs.build_holdings
+      - name: Migrate forward snapshot to new strategy when required
+        run: python -m jobs.refresh
       - name: Update static fallbacks
         run: |
+          cp state/current_snapshot.json site/data/current_snapshot.json
           cp state/scenarios.json site/data/scenarios.json
           cp state/research_cache.json site/data/research_cache.json
           cp state/holdings_cache.json site/data/holdings_cache.json
@@ -41,7 +44,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add state/scenarios.json state/research_cache.json state/holdings_cache.json site/data/scenarios.json site/data/research_cache.json site/data/holdings_cache.json
+          git add state/current_snapshot.json state/scenarios.json state/research_cache.json state/holdings_cache.json site/data/current_snapshot.json site/data/scenarios.json site/data/research_cache.json site/data/holdings_cache.json
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "Refresh daily research cache"
           git pull --rebase origin main

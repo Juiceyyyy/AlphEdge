@@ -1,8 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Joshua Menezes and AlphEdge contributors
 # SPDX-License-Identifier: MIT
-# AlphEdge - historically selected momentum configuration.
-# Saved baseline simulation: CAGR 40.69% / Max DD -20.91% / Sharpe 1.93 / Calmar 1.95.
-# Rolling windows reuse this selection; they do not establish independent out-of-sample results.
+# AlphEdge research configuration. Historical results must be regenerated after changes.
 
 # Capital
 starting_capital: 10000
@@ -17,6 +15,7 @@ benchmark_ticker: ^NSEI
 
 # Momentum signal (Jegadeesh-Titman style)
 n_hold: 10                         # number of stocks held when fully invested
+risk_off_hold_count: 5            # keep strongest EXISTING 5 when Nifty trend is risk-off; 0 = cash
 rebalance_freq: M                  # monthly first-trading-day rebalance
 lookback_short: 126                # 6 months
 lookback_long: 252                 # 12 months
@@ -30,7 +29,7 @@ vol_window: 63
 require_above_ma: true             # only buy stocks above their 200-DMA
 long_ma_window: 200
 min_momentum: 0.0
-use_trend_filter: true             # cash-out when Nifty < 200-DMA
+use_trend_filter: true             # retain up to five existing positions when Nifty < 200-DMA
 trend_filter_window: 200
 target_total_exposure: 1.0
 

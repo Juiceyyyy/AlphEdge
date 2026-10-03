@@ -104,26 +104,35 @@ def _limit_price(side, reference):
 
 def build_plan(client):
     cfg = StrategyConfig.from_yaml("config.yaml")
-    basket = _current_candidates(cfg.use_trend_filter, cfg.require_above_ma, cfg.n_hold)
     today = datetime.now(IST).date()
-    if (today - date.fromisoformat(basket["date"])).days > 4:
-        raise RuntimeError("Model price date is stale; no plan generated")
-    _check_cadence(today)
     cap = _positive_limit("MAX_CAPITAL_INR")
     per_order = _positive_limit("MAX_ORDER_NOTIONAL_INR")
     managed = set(_json(STATE / "managed_symbols.json", []))
     existing = {h["tradingsymbol"]: int(h.get("quantity", 0)) + int(h.get("t1_quantity", 0))
                 for h in client.holdings() if h.get("exchange") == "NSE" and h.get("product") == "CNC"}
+    held_managed = sorted(s for s in managed if existing.get(s, 0) > 0)
+    held_prices = _reference_prices(client, held_managed, today) if held_managed else {}
+    prior = {"positions": [{"ticker": to_yahoo_symbol(sym), "weight": existing[sym] * held_prices[sym] / cap,
+                             "price": held_prices[sym]} for sym in held_managed]}
+    if sum(p['weight'] for p in prior['positions']) > 1.02:
+        raise RuntimeError('Managed holdings exceed MAX_CAPITAL_INR; increase the explicit limit before planning')
+    basket = _current_candidates(cfg.use_trend_filter, cfg.require_above_ma, cfg.n_hold,
+                                 previous=prior, risk_off_hold_count=cfg.risk_off_hold_count)
+    if (today - date.fromisoformat(basket["date"])).days > 4:
+        raise RuntimeError("Model price date is stale; no plan generated")
+    if basket["risk_on"]:
+        _check_cadence(today)  # regular expansion stays quarterly and earnings-reviewed
     target_symbols = {p["ticker"].removesuffix(".NS") for p in basket["positions"]}
     symbols = sorted(target_symbols | managed)
     if not symbols:
         raise RuntimeError("No target or managed positions to review")
-    clearance = _check_earnings(target_symbols, today)
+    clearance = _check_earnings(target_symbols, today) if basket["risk_on"] else {}
     prices = _reference_prices(client, symbols, today)
     if any(not math.isfinite(p) or p <= 0 for p in prices.values()):
         raise RuntimeError("Invalid broker quotes")
-    targets = {p["ticker"].removesuffix(".NS"): math.floor(cap * p["weight"] / prices[p["ticker"].removesuffix(".NS")])
-               for p in basket["positions"]}
+    targets = ({p["ticker"].removesuffix(".NS"): math.floor(cap * p["weight"] / prices[p["ticker"].removesuffix(".NS")])
+                for p in basket["positions"]} if basket["risk_on"] else
+               {sym: existing.get(sym, 0) for sym in target_symbols})  # no buys/resizing in risk-off
     orders = []
     for symbol in symbols:
         owned = existing.get(symbol, 0) if symbol in managed else 0

@@ -6,7 +6,7 @@ from shutil import copyfile
 
 ROOT = Path(__file__).resolve().parent.parent
 FILES = ('current_snapshot.json', 'research_cache.json', 'holdings_cache.json',
-         'scenarios.json', 'winner_max_sharpe.json', 'walk_forward.json')
+         'scenarios.json')
 
 
 def export():
