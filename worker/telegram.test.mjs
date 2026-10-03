@@ -59,7 +59,7 @@ test('cash model has readable sections, a small index chart, and no buy instruct
   assert.match(message, /<b>05  SINCE YOU STARTED/);
   assert.match(message, /NIFTY 50/);
   assert.match(message, /RECENT INDEX PATH/);
-  assert.match(message, /retains|Keep up to/);
+  assert.match(message, /Moderate: retain/);
   assert.deepEqual(target.positions, {});
 });
 
@@ -140,12 +140,24 @@ test('onboarding buttons choose paper mode without requiring an ambiguous yes', 
 
 test('custom model targets are selected without attributing default forward KPIs', () => {
   const {snap, baskets} = fixtures();
-  baskets.baskets['1/1/8/3'] = {date: '2026-03-02', risk_on: false,
+  baskets.baskets['1/1/8/5'] = {date: '2026-03-02', risk_on: false,
     positions: [{ticker: 'ABC.NS', weight: .36}]};
   const {message} = buildReport({joined_date: '2026-02-01', capital: 10000,
-    sip: 1000, kpis: true, holdings: 8, retain: 3}, snap, baskets);
+    sip: 1000, kpis: true, holdings: 8, risk: 'moderate'}, snap, baskets);
   assert.match(message, /8-stock monthly model/);
   assert.match(message, /36%/);
   assert.match(message, /only for the published default model/);
   assert.doesNotMatch(message, /Model P\/L/);
+});
+
+
+test('risk appetite choices select the three supported cached models', async () => {
+  const bot = mockBot();
+  try {
+    await bot.command('/start'); await bot.command('10000'); await bot.command('0'); await bot.command('1');
+    assert.match((await bot.command('/risk low')).text, /low risk/);
+    assert.equal(JSON.parse(bot.store.get('sub:123')).risk, 'low');
+    assert.match((await bot.command('/risk aggressive')).text, /aggressive risk/);
+    assert.match((await bot.command('/risk moderate')).text, /moderate risk/);
+  } finally { bot.restore(); }
 });

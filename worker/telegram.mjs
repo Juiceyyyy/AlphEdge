@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // Free Cloudflare Worker: private onboarding, instant commands, scheduled research alerts.
 const SOURCE = 'https://raw.githubusercontent.com/Juiceyyyy/AlphEdge/main/state/';
-const HELP = `<b>ALPHEDGE  /  RESEARCH BOT</b>\n\n/start — Set up or resume tracking\n/now — Latest model report\n/settings — Your assumptions and tracking mode\n/capital 10000 — Initial amount (₹)\n/sip 5000 — Monthly amount (₹)\n/holdings 10 — Risk-on holdings (5–10)\n/retain 5 — Existing holdings kept risk-off (0–N)\n/trend on|off — Nifty 200-day filter\n/stock on|off — Stock 200-day filter\n/kpis on|off — Toggle performance section\n/help — Commands\n/stop — Delete your subscription\n\n<i>Research model only. No broker access or orders.</i>`;
+const HELP = `<b>ALPHEDGE  /  RESEARCH BOT</b>\n\n/start — Set up or resume tracking\n/now — Latest model report\n/settings — Your assumptions and tracking mode\n/capital 10000 — Initial amount (₹)\n/sip 5000 — Monthly amount (₹)\n/holdings 10 — Risk-on holdings (5–10)\n/risk low|moderate|aggressive — Risk appetite\n/stock on|off — Stock 200-day filter\n/kpis on|off — Toggle performance section\n/help — Commands\n/stop — Delete your subscription\n\n<i>Research model only. No broker access or orders.</i>`;
 const amount = n => `${n < 0 ? '-' : ''}₹${Math.abs(n).toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
 const pct = n => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
 const escape = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -78,9 +78,13 @@ export function subscriberPerformance(sub, forward) {
     dd: dd * 100, niftyDd: niftyDd * 100};
 }
 
-const modelSettings = sub => ({count: sub.holdings ?? 10, retain: sub.retain ?? 5,
-  trend: sub.trend ?? true, stock: sub.stock ?? true});
-const modelKey = sub => {const m = modelSettings(sub);return `${Number(m.trend)}/${Number(m.stock)}/${m.count}/${m.trend ? Math.min(m.retain, m.count) : 0}`;};
+const modelSettings = sub => ({count: sub.holdings ?? 10, stock: sub.stock ?? true,
+  risk: sub.risk ?? (sub.trend === false ? 'aggressive' : sub.retain === 0 ? 'low' : 'moderate')});
+const modelKey = sub => {
+  const m=modelSettings(sub);
+  return m.risk === 'aggressive' ? `0/${Number(m.stock)}/${m.count}/0`
+    : `1/${Number(m.stock)}/${m.count}/${m.risk === 'low' ? 0 : Math.min(5,m.count)}`;
+};
 export function buildReport(sub, snap, baskets) {
   const model = modelSettings(sub);
   const target = baskets.baskets[modelKey(sub)];
@@ -95,9 +99,9 @@ export function buildReport(sub, snap, baskets) {
     `${String(i + 1).padStart(2)} ${escape(symbol(p.ticker)).padEnd(15)} ${String((p.weight * 100).toFixed(1) + '%').padStart(6)}`);
   const lines = [
     '<b>ALPHEDGE  /  MODEL REVIEW</b>',
-    `<i>Close ${escape(snap.price_date)} · ${model.count}-stock monthly model · keep ${model.retain} in risk-off</i>`, '',
+    `<i>Close ${escape(snap.price_date)} · ${model.count}-stock monthly model · ${model.risk} risk</i>`, '',
     '<b>01  MARKET STATE</b>',
-    `<b>${model.trend ? (target.risk_on ? 'RISK ON' : 'RISK OFF') : 'NIFTY FILTER OFF'}</b>  ·  Nifty 200-day filter`,
+    `<b>${model.risk === 'aggressive' ? 'NIFTY FILTER OFF' : (target.risk_on ? 'RISK ON' : 'RISK OFF')}</b>  ·  Nifty 200-day filter`,
     `Equity  ${bar(equity)} ${(equity * 100).toFixed(0)}%`,
     `Cash    ${bar(1 - equity)} ${((1 - equity) * 100).toFixed(0)}%`, '',
     '<b>02  TARGET HOLDINGS</b>',
@@ -109,7 +113,7 @@ export function buildReport(sub, snap, baskets) {
       : ['First report; no earlier target to compare.']),
     '', '<b>04  MODEL NOTE</b>',
     target.risk_on ? 'Review target weights for the next interval.' :
-      `Keep up to ${model.retain} strongest existing positions; the remaining allocation stays cash until risk-on.`,
+      model.risk === 'low' ? 'Low: sell all model holdings and hold cash until risk-on.' : model.risk === 'moderate' ? 'Moderate: retain the five strongest existing holdings; keep sale proceeds in cash.' : 'Aggressive: the Nifty market filter is off; continue normal monthly selections.',
     '<i>Compare with your own holdings; no orders or share quantities are generated.</i>',
   ];
   if (sub.kpis) {
@@ -137,8 +141,8 @@ const settings = sub => `<b>ALPHEDGE  /  YOUR SETTINGS</b>\n` +
   `Tracking: <b>${active(sub) ? (sub.mode === 'paper' ? 'paper research' : 'live assumption') : 'waiting to start'}</b>\n` +
   `Start: ${sub.joined_date ?? 'not started'}\n` +
   `Initial amount: ${amount(sub.capital)}\nMonthly SIP: ${amount(sub.sip)}\n` +
-  `Model: ${modelSettings(sub).count} stocks · keep ${modelSettings(sub).retain} when risk-off\n` +
-  `Filters: Nifty ${modelSettings(sub).trend ? 'on' : 'off'} · stock ${modelSettings(sub).stock ? 'on' : 'off'}\n` +
+  `Model: ${modelSettings(sub).count} stocks · ${modelSettings(sub).risk} risk\n` +
+  `Stock 200-day filter: ${modelSettings(sub).stock ? 'on' : 'off'}\n` +
   `Performance KPIs: ${sub.kpis ? 'on' : 'off'}\n` +
   '<i>Forward KPIs cover only the default 10-stock / keep-five model; not your actual account.</i>';
 const question = stage => stage === 'capital'
@@ -190,7 +194,7 @@ async function handle(update, env) {
       await send(env, id, question(stored.stage), stored.stage === 'intent' ? beginButtons : undefined);
     } else {
       await save(env, id, {stage: 'capital', status: 'setup', kpis: true});
-      await send(env, id, `<b>WELCOME TO ALPHEDGE</b>\n<i>Follow the published Indian equity research model against the Nifty 50. No broker connection is required.</i>\n\n${question('capital')}`);
+      await send(env, id, `<b>WELCOME TO ALPHEDGE</b>\n<i>Follow the published Indian equity research model against the Nifty 50. Moderate risk (retain five) is the default; /risk changes it. No broker connection is required.</i>\n\n${question('capital')}`);
     }
     return;
   }
@@ -222,21 +226,27 @@ async function handle(update, env) {
     } else await send(env, id, question(stored.stage), stored.stage === 'intent' ? beginButtons : undefined);
     return;
   }
-  if (command === '/holdings' || command === '/retain') {
-    const n = parseAmount(value, command === '/retain');
-    const max = command === '/holdings' ? 10 : modelSettings(stored).count;
-    const min = command === '/holdings' ? 5 : 0;
-    if (n === null || n < min || n > max) {
-      await send(env, id, `Choose a number from ${min} to ${max} for ${command}.`); return;
+  if (command === '/risk') {
+    if (!['low', 'moderate', 'aggressive'].includes(value.toLowerCase())) {
+      await send(env, id, 'Choose /risk low, /risk moderate, or /risk aggressive.'); return;
     }
-    stored[command.slice(1)] = n;
-    if (stored.retain > stored.holdings) stored.retain = stored.holdings;
+    stored.risk = value.toLowerCase();
     stored.last_target = null;
     await save(env, id, stored); await send(env, id, settings(stored));
     return;
   }
-  if ((command === '/trend' || command === '/stock') && ['on', 'off'].includes(value.toLowerCase())) {
-    stored[command.slice(1)] = value.toLowerCase() === 'on';
+  if (command === '/holdings') {
+    const n = parseAmount(value, false);
+    if (n === null || n < 5 || n > 10) {
+      await send(env, id, 'Choose 5 to 10 holdings, for example /holdings 8.'); return;
+    }
+    stored.holdings = n;
+    stored.last_target = null;
+    await save(env, id, stored); await send(env, id, settings(stored));
+    return;
+  }
+  if (command === '/stock' && ['on', 'off'].includes(value.toLowerCase())) {
+    stored.stock = value.toLowerCase() === 'on';
     stored.last_target = null;
     await save(env, id, stored); await send(env, id, settings(stored));
     return;

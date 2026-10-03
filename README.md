@@ -2,7 +2,7 @@
 
 **A configurable Indian equity momentum research system with an optional local Zerodha Kite order runner.** Developed by [Joshua Menezes](https://github.com/Juiceyyyy). The [public research site](https://alph-edge.vercel.app/) shows saved backtests, annual and rolling-window comparisons with the Nifty 50, and model holdings at the latest completed close.
 
-The default model ranks liquid NSE stocks using six- and twelve-month momentum with the most recent 21 sessions skipped. It targets ten stocks, sized by inverse volatility. At a monthly review, if the Nifty is below its 200-day average, it **retains the five strongest stocks it already holds and sells the others**. It does not buy replacements or reinvest the cash during risk-off. On a later risk-on review, it resumes the full target basket. The number kept is configurable from zero (sell all) to the chosen holding count; the website includes both sliders. A model starting in risk-off with no existing positions stays in cash until risk-on.
+The default model ranks liquid NSE stocks using six- and twelve-month momentum with the most recent 21 sessions skipped. It targets ten stocks, sized by inverse volatility. At a monthly review, if the Nifty is below its 200-day average, it **retains the five strongest stocks it already holds and sells the others**. It does not buy replacements or reinvest the cash during risk-off. On a later risk-on review, it resumes the full target basket. Choose a risk appetite: **low** sells all below the Nifty 200-day average, **moderate** retains the five strongest existing holdings and holds the sale proceeds in cash, and **aggressive** ignores that market filter and continues the normal monthly buying rule. The website offers these three presets alongside the 5–10 holding-count slider. A model starting in risk-off with no existing positions stays in cash until risk-on.
 
 The website and bot are research interfaces; neither connects to a visitor's broker. The local runner is an explicit, opt-in order planner for one account. Backtests are selected historical simulations using today's constituent universe, not point-in-time verified investment returns. Historical costs are simplified; actual taxes, fees, dividends, fills, data delays, and selection bias can change outcomes.
 
@@ -19,7 +19,7 @@ pip install -r requirements.txt
 python -m alpha_strategy.cli.momentum --help
 ```
 
-On macOS/Linux use `source .venv/bin/activate` instead. Edit [`config.yaml`](config.yaml) for your universe, target holdings, `risk_off_hold_count`, moving-average filters, sizing, and cost assumptions. The default is ten target holdings and five retained on risk-off. Market-data downloads require network access. The bundled JSON assets are historical research examples, not a live quote source.
+On macOS/Linux use `source .venv/bin/activate` instead. Edit [`config.yaml`](config.yaml) for your universe, target holdings, `risk_off_hold_count`, moving-average filters, sizing, and cost assumptions. The three published presets are low (trend on, retention zero), moderate (trend on, retention five), and aggressive (trend off). The default is moderate with ten target holdings and five retained on risk-off. Other custom YAML combinations run locally, but the published cached website only includes the three presets. Market-data downloads require network access. The bundled JSON assets are historical research examples, not a live quote source.
 
 To refresh a local forward model and view the research site:
 

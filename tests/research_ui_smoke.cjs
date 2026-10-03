@@ -9,7 +9,7 @@ class Element{
 }
 const els=new Map(),get=id=>els.get(id)||(els.set(id,new Element()),els.get(id));
 Object.assign(get('lump'),{value:'100000'});Object.assign(get('sip'),{value:'10000'});
-Object.assign(get('holdings'),{value:'10'});Object.assign(get('model-holdings'),{value:'10'});Object.assign(get('retain'),{value:'5'});Object.assign(get('model-retain'),{value:'5'});
+Object.assign(get('holdings'),{value:'10'});Object.assign(get('model-holdings'),{value:'10'});Object.assign(get('risk-profile'),{value:'moderate'});Object.assign(get('model-risk-profile'),{value:'moderate'});
 Object.assign(get('growth-chart'),{clientWidth:320,clientHeight:220});
 const months=Array.from({length:36},(_,i)=>({date:`2023-${String(i%12+1).padStart(2,'0')}-28`,strategy_return:.01,benchmark_return:.005}));
 const scenario={kpis:{cagr_pct:22,max_drawdown_pct:-18,sharpe:1.2,benchmark_cagr_pct:8,start:'2011',end:'2026'},months};
@@ -31,7 +31,7 @@ setTimeout(()=>{
  assert.equal(get('candidate-positions').children.length,2);
  assert.match(get('contributed-total').textContent,/₹/);
  const before=requests;
- get('trend').checked=false;get('trend').handlers.input();
+ get('risk-profile').value='aggressive';get('risk-profile').handlers.input();
  get('model-holdings').value='6';get('model-holdings').handlers.input();
  assert.equal(requests,before,'controls replay cached paths without network calls');
  assert.match(get('chart-mode').textContent,/Saved path/);

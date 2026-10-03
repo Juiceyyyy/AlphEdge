@@ -44,10 +44,13 @@
     });
   }
 
-  const key = (a,b,c,d) => `${Number(a)}/${Number(b)}/${Number(c)}/${a?Math.min(Number(c),Number(d)):0}`;
-  function clampRetain(prefix){const count=Number($(prefix+'holdings').value),slider=$(prefix+'retain');slider.max=String(count);if(Number(slider.value)>count)slider.value=String(count);set(prefix+'retain-value',`${slider.value} of ${count} stocks`);}
-  const chartKey = () => key($('trend').checked,$('stock').checked,$('holdings').value,$('retain').value);
-  const basketKey = () => key($('model-trend').checked,$('model-stock').checked,$('model-holdings').value,$('model-retain').value);
+  const profileKey = (profile, stock, count) => {
+    const n=Number(count);
+    return profile==='aggressive' ? `0/${Number(stock)}/${n}/0`
+      : `1/${Number(stock)}/${n}/${profile==='low'?0:Math.min(5,n)}`;
+  };
+  const chartKey = () => profileKey($('risk-profile').value,$('stock').checked,$('holdings').value);
+  const basketKey = () => profileKey($('model-risk-profile').value,$('model-stock').checked,$('model-holdings').value);
   let manifest=null, scenarios=null, activePeriod='120';
   const svgNS='http://www.w3.org/2000/svg';
   const node=(parent,tag,attrs,label)=>{const el=document.createElementNS(svgNS,tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));if(label!==undefined)el.textContent=label;parent.append(el);return el;};
@@ -75,7 +78,7 @@
   }
   function renderBasket(){
     if(!manifest)return;
-    clampRetain('model-');set('model-holdings-value',`${$('model-holdings').value} stocks`);
+    set('model-holdings-value',`${$('model-holdings').value} stocks`);
     const cached=manifest.holdings?.baskets?.[basketKey()];
     const basket=cached || (basketKey()==='1/1/10/5'?manifest.snapshot?.basket:null);
     const list=$('candidate-positions');list.replaceChildren();
@@ -127,7 +130,7 @@
     svg.setAttribute('aria-label',`Strategy and Nifty from ${rows[0].date} through ${rows.at(-1).date}`);
   }
   function renderBacktest(){
-    set('lump-value',money($('lump').value));set('sip-value',money($('sip').value));set('holdings-value',`${$('holdings').value} stocks`);clampRetain('');
+    set('lump-value',money($('lump').value));set('sip-value',money($('sip').value));set('holdings-value',`${$('holdings').value} stocks`);
     if(!manifest)return;
     const variant=scenarios?.variants?.[chartKey()];
     if(!variant){set('chart-mode','Loading cached history');inform('Loading the saved research paths…');return;}
@@ -162,11 +165,11 @@
     chart(use,'forward-chart',null,true);
     $('forward-chart').setAttribute('aria-label',reconstructed.length?'Retrospective 2026 backtest path from January':'Recorded daily model from first public snapshot');
   }
-  ['lump','sip','trend','stock','holdings','retain'].forEach(id=>{
+  ['lump','sip','risk-profile','stock','holdings'].forEach(id=>{
     $(id).addEventListener('input',renderBacktest);
     $(id).addEventListener('change',()=>{revealedCharts.delete('growth-chart');renderBacktest();});
   });
-  ['model-trend','model-stock','model-holdings','model-retain'].forEach(id=>$(id).addEventListener('input',renderBasket));
+  ['model-risk-profile','model-stock','model-holdings'].forEach(id=>$(id).addEventListener('input',renderBasket));
   document.querySelectorAll('[data-period]').forEach(button=>button.addEventListener('click',()=>{activePeriod=button.dataset.period;revealedCharts.delete('growth-chart');document.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b===button));renderBacktest();}));
   ['start-month','end-month'].forEach(id=>$(id).addEventListener('input',()=>{activePeriod='custom';revealedCharts.delete('growth-chart');document.querySelectorAll('[data-period]').forEach(b=>b.classList.remove('active'));renderBacktest();}));
   async function staticJson(name) {
