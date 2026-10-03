@@ -287,7 +287,11 @@ def run(mode):
             handle(update.get("message", {}), state)
             save_state(state)
     if mode in ("report", "both") and state["subscribers"]:
-        snapshot, holdings = market_data()
+        try:
+            snapshot, holdings = market_data()
+        except (OSError, ValueError, KeyError, RuntimeError):
+            print("Market data incomplete or stale; subscriber reports deferred")
+            return
         day = snapshot["price_date"]
         for chat_id, subscriber in list(state["subscribers"].items()):
             previous = subscriber.get("last_target")
