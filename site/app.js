@@ -31,6 +31,10 @@
     if (!Number.isFinite(target)) { set(id,'—'); return; }
     if (!motionOK()) { set(id,format(target)); element.dataset.number=String(target); return; }
     const previous=animations.get(id); if(previous) cancelAnimationFrame(previous);
+    const box=element.getBoundingClientRect();
+    if(box.bottom<=0 || box.top>=window.innerHeight*.9){
+      set(id,format(target));element.dataset.number=String(target);return;
+    }
     whenVisible(element, () => {
     const start=Number(element.dataset.number??0), begun=performance.now();
     function frame(now) {
