@@ -6,7 +6,7 @@ from shutil import copyfile
 
 ROOT = Path(__file__).resolve().parent.parent
 FILES = ('current_snapshot.json', 'research_cache.json', 'holdings_cache.json',
-         'scenarios.json')
+         'scenarios.json', 'benchmarks.json')
 
 
 def export():
@@ -26,7 +26,8 @@ def export():
                            ('dashboard/logo.svg','logo.svg')]:
         copyfile(ROOT / source, site / target)
     for name in FILES:
-        copyfile(ROOT / 'state' / name, data / name)
+        if (ROOT / 'state' / name).exists():
+            copyfile(ROOT / 'state' / name, data / name)
     print(f'Exported static site with {len(FILES)} fallback data files')
 
 if __name__ == '__main__':
