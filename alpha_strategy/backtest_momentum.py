@@ -475,6 +475,12 @@ def run_momentum_backtest(cfg: StrategyConfig,
         price = float(df.loc[last_date, 'Close']) if df is not None and last_date in df.index else h['avg_price']
         latest_positions.append({'ticker': sym, 'weight': h['qty'] * price / last_equity,
                                  'price': price})
+    if pending_rebalance is not None:
+        # The last close may have generated next-session targets. Publish that
+        # decision, not the portfolio just before the pending rebalance.
+        latest_positions = [{'ticker': sym, 'weight': weight,
+                             'price': float(raw[sym].loc[last_date, 'Close'])}
+                            for sym, weight in pending_rebalance.items()]
     return MomentumResult(
         latest_positions=latest_positions,
         equity_curve=eq, benchmark_curve=bench_curve,
