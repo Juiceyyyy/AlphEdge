@@ -6,10 +6,22 @@ from datetime import datetime, timezone
 import pandas as pd
 
 from alpha_strategy.backtest_momentum import MomentumResult
-from jobs.build_scenarios import completed_sessions, monthly_path
+from jobs.build_scenarios import completed_sessions, monthly_path, reusable_variants
 
 
 class ScenarioCacheTest(unittest.TestCase):
+    def test_expansion_reuses_only_matching_date_and_strategy(self):
+        keys = {f"{int(trend)}/{int(stock)}/{count}/{retained if trend else 0}": {}
+                for trend in (True, False) for stock in (True, False)
+                for count in range(5, 11)
+                for retained in ((0, 5) if trend else (0,))}
+        previous = {'strategy_id': 'hold-five-v1', 'data_through': '2026-10-01',
+                    'variants': keys}
+        self.assertEqual(len(reusable_variants(previous, '2026-10-01', 'new')), 36)
+        self.assertEqual(reusable_variants(previous, '2026-10-02', 'new'), {})
+        previous['build_fingerprint'] = 'old'
+        self.assertEqual(reusable_variants(previous, '2026-10-01', 'new'), {})
+
     def test_incomplete_india_session_is_excluded(self):
         dates = pd.to_datetime(["2026-09-30", "2026-10-01"])
         data = {"^NSEI": pd.DataFrame({"Close": [100, 105]}, index=dates)}
