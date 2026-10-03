@@ -22,4 +22,5 @@ jobs:
         with:
           node-version: '22'
       - run: node --check dashboard/explorer.js
+      - run: node --test worker/telegram.test.mjs
       - run: node tests/research_ui_smoke.cjs

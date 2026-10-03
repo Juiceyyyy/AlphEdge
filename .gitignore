@@ -11,3 +11,4 @@ logs/
 *.parquet
 .pytest_cache/
 .DS_Store
+wrangler.toml
