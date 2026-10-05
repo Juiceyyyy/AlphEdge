@@ -42,10 +42,21 @@ jobs:
         run: python -m jobs.build_research_cache
       - name: Build daily target baskets
         run: python -m jobs.build_holdings
-      - name: Migrate forward snapshot to new strategy when required
+      - name: Advance forward snapshot only when required
         env:
           RESEARCH_SNAPSHOT_FILE: state/current_snapshot.json
-        run: python -m jobs.refresh
+        run: |
+          python - <<'PYREFRESH'
+          import json
+          from pathlib import Path
+          snapshot = json.loads(Path('state/current_snapshot.json').read_text())
+          scenarios = json.loads(Path('state/scenarios.json').read_text())
+          if snapshot.get('strategy_id') != scenarios.get('strategy_id') or snapshot['price_date'] < scenarios['data_through']:
+              from jobs.refresh import refresh
+              refresh()
+          else:
+              print(f"Forward snapshot already covers {snapshot['price_date']}")
+          PYREFRESH
       - name: Verify one coherent publication date
         run: |
           python - <<'PYVERIFY'
