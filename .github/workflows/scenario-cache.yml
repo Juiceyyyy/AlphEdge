@@ -27,6 +27,13 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: pip install -r requirements.txt
+      - name: Restore market-data downloads
+        uses: actions/cache@v4
+        with:
+          path: cache/
+          key: market-data-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            market-data-${{ runner.os }}-
       - name: Build historical scenarios
         run: python -m jobs.build_scenarios
       - name: Cache Yahoo index price closes
@@ -39,6 +46,22 @@ jobs:
         env:
           RESEARCH_SNAPSHOT_FILE: state/current_snapshot.json
         run: python -m jobs.refresh
+      - name: Verify one coherent publication date
+        run: |
+          python - <<'PYVERIFY'
+          import json
+          from pathlib import Path
+          names = ('scenarios', 'benchmarks', 'research_cache', 'holdings_cache', 'current_snapshot')
+          data = {name: json.loads((Path('state') / (name + '.json')).read_text()) for name in names}
+          date = data['scenarios']['data_through']
+          assert all(data[name]['data_through'] == date for name in ('benchmarks', 'research_cache'))
+          assert data['holdings_cache']['price_date'] == date
+          assert data['current_snapshot']['price_date'] == date
+          assert data['current_snapshot']['forward'][-1]['date'] == date
+          assert data['holdings_cache']['baskets']['1/1/10/5']['date'] == date
+          assert len({data[name]['strategy_id'] for name in names}) == 1
+          print(f'Validated synchronized research through {date}')
+          PYVERIFY
       - name: Update static fallbacks
         run: |
           cp state/current_snapshot.json hosting/site/data/current_snapshot.json
@@ -53,5 +76,6 @@ jobs:
           git add state/benchmarks.json hosting/site/data/benchmarks.json state/current_snapshot.json state/scenarios.json state/research_cache.json state/holdings_cache.json hosting/site/data/current_snapshot.json hosting/site/data/scenarios.json hosting/site/data/research_cache.json hosting/site/data/holdings_cache.json
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "Refresh daily research cache"
-          git pull --rebase origin main
+          git fetch origin main
+          git rebase -X theirs origin/main
           git push origin HEAD:main

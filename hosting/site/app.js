@@ -248,7 +248,12 @@
         manifest=await overview.json();scenarios=await paths.json();
         if(!manifest.benchmarks){try{manifest.benchmarks=await staticJson('benchmarks.json');}catch(_){manifest.benchmarks=null;}}
       }
-      if(manifest.benchmarks?.data_through!==scenarios?.data_through)manifest.benchmarks=null;
+      const publishedDate=scenarios?.data_through;
+      if(!publishedDate||manifest?.research?.data_through!==publishedDate||
+          manifest?.holdings?.price_date!==publishedDate||manifest?.snapshot?.price_date!==publishedDate||
+          manifest?.snapshot?.forward?.at(-1)?.date!==publishedDate)
+        throw Error('Updated research is being calculated. The page checks for verified results automatically.');
+      if(manifest.benchmarks?.data_through!==publishedDate)manifest.benchmarks=null;
       if(scenarios?.strategy_id!=='hold-five-v1'||manifest?.research?.strategy_id!=='hold-five-v1'||manifest?.holdings?.strategy_id!=='hold-five-v1'||manifest?.snapshot?.strategy_id!=='hold-five-v1'||!scenarios?.variants?.['1/1/10/5'])throw Error('Updated research is being calculated. The page checks for verified results automatically.');
       const months=scenarios.variants['1/1/10/5'].months;
       $('start-month').min=months[0].date.slice(0,7);$('start-month').max=months.at(-1).date.slice(0,7);
