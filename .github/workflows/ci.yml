@@ -30,7 +30,14 @@ jobs:
           root = Path('hosting/site')
           for name in ('index.html', 'app.js', 'styles.css', 'logo.svg', 'og-image.png'):
               assert (root / name).is_file(), name
-          for name in ('current_snapshot.json', 'scenarios.json', 'benchmarks.json', 'research_cache.json', 'holdings_cache.json'):
-              assert json.loads((root / 'data' / name).read_text()) == json.loads((Path('state') / name).read_text()), name
+          data = {name: json.loads((root / 'data' / (name + '.json')).read_text())
+                  for name in ('current_snapshot', 'scenarios', 'benchmarks', 'research_cache', 'holdings_cache')}
+          date = data['scenarios']['data_through']
+          assert data['research_cache']['data_through'] == date
+          assert data['benchmarks']['data_through'] == date
+          assert data['holdings_cache']['price_date'] == date
+          assert data['current_snapshot']['price_date'] == date
+          assert data['current_snapshot']['forward'][-1]['date'] == date
+          assert len({item['strategy_id'] for item in data.values()}) == 1
           assert json.loads(Path('vercel.json').read_text())['outputDirectory'] == str(root)
           PY
