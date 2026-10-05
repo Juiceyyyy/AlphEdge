@@ -243,7 +243,7 @@
   async function staticJson(name, bundled=false) {
     if(!bundled){
       const upstream=`https://raw.githubusercontent.com/Juiceyyyy/AlphEdge/main/state/${name}`;
-      try {const response=await fetch(upstream,{cache:'no-store'});if(response.ok)return await response.json();}
+      try {const response=await fetch(upstream,{cache:'no-store',signal:AbortSignal.timeout(7000)});if(response.ok)return await response.json();}
       catch (_) { /* use the deployed copy below */ }
     }
     const local=await fetch(`/data/${name}`);
