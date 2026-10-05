@@ -3,7 +3,7 @@
 name: Build scenario cache
 on:
   schedule:
-    - cron: '33 13 * * 1-5' # Daily after India market close; schedule may be delayed.
+    - cron: '33 13,15 * * 1-5' # Two weekday chances after India market close; GitHub may delay schedules.
   workflow_dispatch:
   push:
     branches: [main]

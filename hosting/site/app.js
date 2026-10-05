@@ -226,13 +226,23 @@
   ['model-stock','model-holdings'].forEach(id=>$(id).addEventListener('input',renderBasket));
   document.querySelectorAll('[data-period]').forEach(button=>button.addEventListener('click',()=>{activePeriod=button.dataset.period;revealedCharts.delete('growth-chart');document.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b===button));renderBacktest();}));
   ['start-month','end-month'].forEach(id=>$(id).addEventListener('input',()=>{activePeriod='custom';revealedCharts.delete('growth-chart');document.querySelectorAll('[data-period]').forEach(b=>b.classList.remove('active'));renderBacktest();}));
-  async function staticJson(name) {
-    const upstream=`https://raw.githubusercontent.com/Juiceyyyy/AlphEdge/main/state/${name}`;
-    try {const response=await fetch(upstream,{cache:'no-store'});if(response.ok)return await response.json();}
-    catch (_) { /* use the deployed copy below */ }
+  async function staticJson(name, bundled=false) {
+    if(!bundled){
+      const upstream=`https://raw.githubusercontent.com/Juiceyyyy/AlphEdge/main/state/${name}`;
+      try {const response=await fetch(upstream,{cache:'no-store'});if(response.ok)return await response.json();}
+      catch (_) { /* use the deployed copy below */ }
+    }
     const local=await fetch(`/data/${name}`);
     if(!local.ok)throw Error(`${name} unavailable`);
     return local.json();
+  }
+  function coherent(snapshot,research,holdings,paths){
+    const day=paths?.data_through;
+    return day&&research?.data_through===day&&holdings?.price_date===day&&
+      snapshot?.price_date===day&&snapshot?.forward?.at(-1)?.date===day&&
+      paths?.strategy_id==='hold-five-v1'&&research?.strategy_id===paths.strategy_id&&
+      holdings?.strategy_id===paths.strategy_id&&snapshot?.strategy_id===paths.strategy_id&&
+      paths?.variants?.['1/1/10/5'];
   }
   async function load(){
     try{
@@ -240,8 +250,19 @@
         const [snapshot,research,holdings,paths,benchmarkData]=await Promise.all([
           staticJson('current_snapshot.json'),staticJson('research_cache.json'),
           staticJson('holdings_cache.json'),staticJson('scenarios.json'),staticJson('benchmarks.json').catch(()=>null)]);
-        manifest={snapshot,research,holdings,benchmarks:benchmarkData?.strategy_id===paths.strategy_id?benchmarkData:null};
-        scenarios=paths;
+        if(coherent(snapshot,research,holdings,paths)){
+          manifest={snapshot,research,holdings,benchmarks:benchmarkData?.strategy_id===paths.strategy_id?benchmarkData:null};
+          scenarios=paths;
+        }else{
+          // A GitHub CDN edge can temporarily return files from different commits.
+          const [savedSnapshot,savedResearch,savedHoldings,savedPaths,savedBenchmarks]=await Promise.all([
+            staticJson('current_snapshot.json',true),staticJson('research_cache.json',true),
+            staticJson('holdings_cache.json',true),staticJson('scenarios.json',true),
+            staticJson('benchmarks.json',true).catch(()=>null)]);
+          manifest={snapshot:savedSnapshot,research:savedResearch,holdings:savedHoldings,
+            benchmarks:savedBenchmarks?.strategy_id===savedPaths.strategy_id?savedBenchmarks:null};
+          scenarios=savedPaths;
+        }
       }else{
         const [overview,paths]=await Promise.all([fetch('/api/explore',{cache:'no-store'}),fetch('/api/explore/scenarios')]);
         if(!overview.ok||!paths.ok)throw Error('Saved data could not be fetched');
