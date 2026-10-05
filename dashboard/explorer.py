@@ -20,26 +20,42 @@ from .app_data import read_json
 from .store import read_remote_json
 
 ROOT = Path(__file__).resolve().parent.parent
-ASSETS = Path(__file__).resolve().parent
+ASSETS = ROOT / "hosting" / "site"
 router = APIRouter()
 @router.get("/explore", include_in_schema=False)
 def page():
-    return FileResponse(ASSETS / "explorer.html", media_type="text/html")
+    return FileResponse(ASSETS / "index.html", media_type="text/html")
 
 
+@router.get("/styles.css", include_in_schema=False)
 @router.get("/explore/styles.css", include_in_schema=False)
 def styles():
-    return FileResponse(ASSETS / "explorer.css", media_type="text/css")
+    return FileResponse(ASSETS / "styles.css", media_type="text/css")
 
 
+@router.get("/app.js", include_in_schema=False)
 @router.get("/explore/app.js", include_in_schema=False)
 def script():
-    return FileResponse(ASSETS / "explorer.js", media_type="application/javascript")
+    return FileResponse(ASSETS / "app.js", media_type="application/javascript")
 
 
+@router.get("/logo.svg", include_in_schema=False)
 @router.get("/explore/logo.svg", include_in_schema=False)
 def logo():
     return FileResponse(ASSETS / "logo.svg", media_type="image/svg+xml")
+
+
+@router.get("/data/{name}", include_in_schema=False)
+def local_data(name: str):
+    if name not in {"current_snapshot.json", "scenarios.json", "benchmarks.json",
+                    "research_cache.json", "holdings_cache.json"}:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404)
+    path = ROOT / "state" / name
+    if not path.is_file():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="application/json")
 
 
 PUBLIC_STATE = "https://raw.githubusercontent.com/Juiceyyyy/AlphEdge/main/state/"
