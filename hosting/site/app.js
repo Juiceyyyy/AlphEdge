@@ -202,12 +202,26 @@
     const history=scenarios?.variants?.['1/1/10/5']?.months?.filter(m=>m.date.slice(0,4)==='2026')||[];
     let a=100,b=100;const extra={};for(const key of ['midcap150','smallcap250']){const levels=benchLevels(key),all=scenarios?.variants?.['1/1/10/5']?.months||[],first=all.findIndex(m=>m.date===history[0]?.date),prior=first>0?levels.get(all[first-1].date):manifest?.benchmarks?.initial?.[key];extra[key]={levels,previous:prior,value:prior?100:null};}
     const reconstructed=history.length?[{date:'2026-01-01',model_index:100,benchmark_index:100,midcap150_index:extra.midcap150.value,smallcap250_index:extra.smallcap250.value},...history.map(m=>{a*=1+m.strategy_return;b*=1+m.benchmark_return;const point={date:m.date,model_index:a,benchmark_index:b};for(const key of Object.keys(extra)){const item=extra[key],level=item.levels.get(m.date);if(item.previous&&level&&item.value!==null)item.value*=level/item.previous;else item.value=null;point[`${key}_index`]=item.value;item.previous=level;}return point;})]:[];
-    // Never splice distinct retrospectively calculated and daily observed series.
-    const use=reconstructed.length?reconstructed:recorded;
-    if(use.length){metric('forward-model',use.at(-1).model_index,n=>n.toFixed(2));metric('forward-nifty',use.at(-1).benchmark_index,n=>n.toFixed(2));for(const key of ['midcap150','smallcap250']){const value=use.at(-1)[`${key}_index`];if(Number.isFinite(value))metric(`forward-${key.replace('150','').replace('250','')}`,value,n=>n.toFixed(2));else set(`forward-${key.replace('150','').replace('250','')}`,'—');}}
+    // The 2026 reconstruction is historical context. From 2027 onward, show
+    // the recorded forward series across every saved year without splicing it.
+    const showReconstruction=Number(scenarios?.data_through?.slice(0,4))===2026&&reconstructed.length>0;
+    const use=showReconstruction?reconstructed:recorded;
+    set('forward-heading',showReconstruction?'2026 model timeline':'Recorded model since launch');
+    set('forward-model-label',showReconstruction?'Reconstructed model index':'Recorded model index');
+    set('forward-description',showReconstruction
+      ? 'The 2026 path is reconstructed from historical monthly backtests. The daily forward record begins at its first saved snapshot.'
+      : 'The daily forward research record runs from its first public snapshot through the latest completed close.');
+    set('forward-note',showReconstruction
+      ? `This 2026 reconstruction is retrospective. The separately recorded daily model began ${recorded[0]?.date||'at its first public snapshot'}; these series are not joined. Both are hypothetical.`
+      : `Recorded model from ${recorded[0]?.date||'its first public snapshot'} through ${recorded.at(-1)?.date||'the latest saved close'}. Historical backtests and monthly Midcap/Smallcap comparisons appear above. This is not an actual account.`);
+    for(const key of ['midcap','smallcap']){
+      $(`forward-${key}`).parentElement.hidden=!showReconstruction;
+      document.querySelector(`.forward-wrap`).previousElementSibling.querySelector(`.${key}-key`).parentElement.hidden=!showReconstruction;
+    }
+    if(use.length){metric('forward-model',use.at(-1).model_index,n=>n.toFixed(2));metric('forward-nifty',use.at(-1).benchmark_index,n=>n.toFixed(2));if(showReconstruction)for(const key of ['midcap150','smallcap250']){const value=use.at(-1)[`${key}_index`];if(Number.isFinite(value))metric(`forward-${key.replace('150','').replace('250','')}`,value,n=>n.toFixed(2));else set(`forward-${key.replace('150','').replace('250','')}`,'—');}}
     set('forward-period',use.length?`${use[0].date} — ${use.at(-1).date}`:'Awaiting saved path');
     chart(use,'forward-chart',null,true);
-    $('forward-chart').setAttribute('aria-label',reconstructed.length?'Retrospective 2026 backtest path from January':'Recorded daily model from first public snapshot');
+    $('forward-chart').setAttribute('aria-label',showReconstruction?'Retrospective 2026 backtest path from January':`Recorded daily model from ${recorded[0]?.date||'first public snapshot'} through ${recorded.at(-1)?.date||'latest close'}`);
   }
   document.querySelectorAll('[data-risk-control]').forEach(control=>{
     const input=$(control.dataset.riskControl);
