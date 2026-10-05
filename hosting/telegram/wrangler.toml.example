@@ -1,6 +1,6 @@
 # Copy to wrangler.toml and replace the KV namespace ID before deployment.
 name = "alphedge-research-bot"
-main = "worker/telegram.mjs"
+main = "worker.mjs"
 compatibility_date = "2026-09-01"
 
 [[kv_namespaces]]

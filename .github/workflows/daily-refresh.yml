@@ -34,16 +34,16 @@ jobs:
           RESEARCH_SNAPSHOT_FILE: state/current_snapshot.json
         run: python -m jobs.refresh
       - name: Update static fallback
-        run: cp state/current_snapshot.json site/data/current_snapshot.json
+        run: cp state/current_snapshot.json hosting/site/data/current_snapshot.json
       - name: Commit changed snapshot
         run: |
-          if git diff --quiet -- state/current_snapshot.json site/data/current_snapshot.json && [ -z "$(git ls-files --others --exclude-standard -- state/current_snapshot.json)" ]; then
+          if git diff --quiet -- state/current_snapshot.json hosting/site/data/current_snapshot.json && [ -z "$(git ls-files --others --exclude-standard -- state/current_snapshot.json)" ]; then
             echo "No new price date; nothing to commit"
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add state/current_snapshot.json site/data/current_snapshot.json
+          git add state/current_snapshot.json hosting/site/data/current_snapshot.json
           git commit -m "Update research snapshot"
           git pull --rebase origin main
           git push origin HEAD:main

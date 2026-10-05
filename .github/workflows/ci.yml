@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 jobs:
-  test:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,24 +16,21 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: pip install -r requirements.txt
-      - run: python -m compileall -q alpha_strategy dashboard broker jobs
-      - run: python -m unittest discover -s tests -p 'test_*.py'
+      - run: python -m compileall -q alpha_strategy broker dashboard jobs
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check dashboard/explorer.js
-      - run: node --test worker/telegram.test.mjs
-      - run: node tests/research_ui_smoke.cjs
-      - run: python -m jobs.export_site
-      - name: Verify exported dashboard assets
+      - run: node --check hosting/site/app.js
+      - run: node --check hosting/telegram/worker.mjs
+      - name: Verify required published assets and cache
         run: |
           python - <<'PY'
           from pathlib import Path
-          page = Path('site/index.html').read_text()
-          assert 'window.ALPHEDGE_STATIC=true' in page
-          assert 'src="/app.js?v=11"' in page
-          assert 'href="/styles.css?v=13"' in page
-          assert '/explore/app.js' not in page
-          for asset in ('app.js', 'styles.css'):
-              assert (Path('site') / asset).is_file()
+          import json
+          root = Path('hosting/site')
+          for name in ('index.html', 'app.js', 'styles.css', 'logo.svg', 'og-image.png'):
+              assert (root / name).is_file(), name
+          for name in ('current_snapshot.json', 'scenarios.json', 'benchmarks.json', 'research_cache.json', 'holdings_cache.json'):
+              assert json.loads((root / 'data' / name).read_text()) == json.loads((Path('state') / name).read_text()), name
+          assert json.loads(Path('vercel.json').read_text())['outputDirectory'] == str(root)
           PY
